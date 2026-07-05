@@ -9,6 +9,7 @@ const recipeSchema = z.object({
   title: z.string().min(3).max(255),
   description: z.string().min(1),
   steps: z.string().min(1),
+  servings: z.number().int().positive(),
   ingredients: z
     .array(
       z.object({
@@ -20,7 +21,7 @@ const recipeSchema = z.object({
 });
 
 const RECIPE_FIELDS = `
-  r.id, r.title, r.description, r.steps, r.status,
+  r.id, r.title, r.description, r.steps, r.servings, r.status,
   r.created_at, r.reviewed_at, r.author_id, u.username AS author_username
 `;
 
@@ -162,13 +163,13 @@ router.post("/", requireAuth, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
-  const { title, description, steps, ingredients } = parsed.data;
+  const { title, description, steps, servings, ingredients } = parsed.data;
 
   const result = await pool.query(
-    `INSERT INTO recipes (title, description, steps, author_id, status)
-     VALUES ($1, $2, $3, $4, 'pending')
-     RETURNING id, title, description, steps, status, created_at, author_id`,
-    [title, description, steps, req.user!.id]
+    `INSERT INTO recipes (title, description, steps, servings, author_id, status)
+     VALUES ($1, $2, $3, $4, $5, 'pending')
+     RETURNING id, title, description, steps, servings, status, created_at, author_id`,
+    [title, description, steps, servings, req.user!.id]
   );
   const recipe = result.rows[0];
 
@@ -199,12 +200,12 @@ router.put("/:id", requireAuth, async (req, res) => {
     return res.status(409).json({ error: "Seule une recette en attente peut être modifiée." });
   }
 
-  const { title, description, steps, ingredients } = parsed.data;
+  const { title, description, steps, servings, ingredients } = parsed.data;
   const result = await pool.query(
-    `UPDATE recipes SET title = $1, description = $2, steps = $3
-     WHERE id = $4
-     RETURNING id, title, description, steps, status, created_at, author_id`,
-    [title, description, steps, req.params.id]
+    `UPDATE recipes SET title = $1, description = $2, steps = $3, servings = $4
+     WHERE id = $5
+     RETURNING id, title, description, steps, servings, status, created_at, author_id`,
+    [title, description, steps, servings, req.params.id]
   );
 
   await writeIngredients(result.rows[0].id, ingredients);

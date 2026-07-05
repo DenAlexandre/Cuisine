@@ -57,8 +57,22 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
     onChange(value.filter((i) => i.alimentCode !== alimentCode));
   }
 
+  function resetSearch() {
+    setQuery("");
+    setGroupFilter(EMPTY_GROUP_FILTER);
+    setSuggestions([]);
+  }
+
   return (
     <div className="ingredient-picker">
+      {(hasQuery || hasGroupFilter) && (
+        <div className="ingredient-picker-toolbar">
+          <button type="button" className="link-button" onClick={resetSearch}>
+            Réinitialiser la recherche
+          </button>
+        </div>
+      )}
+
       <GroupFilters value={groupFilter} onChange={setGroupFilter} />
 
       <div className="ingredient-search">

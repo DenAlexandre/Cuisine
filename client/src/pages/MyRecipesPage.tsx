@@ -16,6 +16,7 @@ const EMPTY_FORM = {
   title: "",
   description: "",
   steps: "",
+  servings: 4,
   ingredients: [] as { alimentCode: number; quantityG: number; nom: string }[],
 };
 
@@ -49,6 +50,7 @@ export function MyRecipesPage() {
         title: form.title,
         description: form.description,
         steps: form.steps,
+        servings: form.servings,
         ingredients: form.ingredients.map(({ alimentCode, quantityG }) => ({
           alimentCode,
           quantityG,
@@ -88,6 +90,17 @@ export function MyRecipesPage() {
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Nombre de personnes
+            <input
+              type="number"
+              min={1}
+              step="1"
+              value={form.servings}
+              onChange={(e) => setForm({ ...form, servings: Number(e.target.value) })}
               required
             />
           </label>

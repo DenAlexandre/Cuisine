@@ -24,6 +24,7 @@ export interface Recipe {
   title: string;
   description: string;
   steps: string;
+  servings: number;
   status: RecipeStatus;
   created_at: string;
   reviewed_at: string | null;
@@ -42,6 +43,7 @@ export interface RecipeInput {
   title: string;
   description: string;
   steps: string;
+  servings: number;
   ingredients: RecipeIngredientInput[];
 }
 

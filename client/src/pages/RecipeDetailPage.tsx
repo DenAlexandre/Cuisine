@@ -35,6 +35,7 @@ export function RecipeDetailPage() {
         <p className={`status-badge status-${recipe.status}`}>{STATUS_LABELS[recipe.status]}</p>
       )}
       <p>{recipe.description}</p>
+      <p className="muted">Pour {recipe.servings} personne{recipe.servings > 1 ? "s" : ""}</p>
 
       <h2>Ingrédients</h2>
       <ul className="ingredient-list-readonly">

@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   steps TEXT NOT NULL,
+  servings INTEGER NOT NULL DEFAULT 1 CHECK (servings > 0),
   author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS recipes (
 
 -- Le champ "ingredients" en texte libre est remplace par la table recipe_ingredients ci-dessous.
 ALTER TABLE recipes DROP COLUMN IF EXISTS ingredients;
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS servings INTEGER NOT NULL DEFAULT 1 CHECK (servings > 0);
 
 CREATE INDEX IF NOT EXISTS idx_recipes_status ON recipes(status);
 CREATE INDEX IF NOT EXISTS idx_recipes_author ON recipes(author_id);

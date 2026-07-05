@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { searchAliments } from "../api/aliments";
 import type { Aliment } from "../api/aliments";
-import { EMPTY_GROUP_FILTER, GroupFilters } from "../components/GroupFilters";
-import type { GroupFilterValue } from "../components/GroupFilters";
+import { CategoryFilter } from "../components/CategoryFilter";
 
 function formatValue(value: number | null): string {
   return value === null ? "—" : value.toString();
@@ -10,28 +9,23 @@ function formatValue(value: number | null): string {
 
 export function NutritionPage() {
   const [query, setQuery] = useState("");
-  const [groupFilter, setGroupFilter] = useState<GroupFilterValue>(EMPTY_GROUP_FILTER);
+  const [categorieCode, setCategorieCode] = useState<number | null>(null);
   const [results, setResults] = useState<Aliment[]>([]);
   const [searched, setSearched] = useState(false);
   const timeoutRef = useRef<number | undefined>(undefined);
 
-  const hasGroupFilter = groupFilter.groupeCode !== null;
   const hasQuery = query.trim().length >= 2;
+  const hasCategory = categorieCode !== null;
 
   useEffect(() => {
     window.clearTimeout(timeoutRef.current);
-    if (!hasQuery && !hasGroupFilter) {
+    if (!hasQuery && !hasCategory) {
       setResults([]);
       setSearched(false);
       return;
     }
     timeoutRef.current = window.setTimeout(() => {
-      searchAliments({
-        q: query.trim(),
-        groupeCode: groupFilter.groupeCode,
-        sousGroupeCode: groupFilter.sousGroupeCode,
-        sousSousGroupeCode: groupFilter.sousSousGroupeCode,
-      })
+      searchAliments({ q: query.trim(), categorieCode })
         .then(({ aliments }) => {
           setResults(aliments);
           setSearched(true);
@@ -39,16 +33,16 @@ export function NutritionPage() {
         .catch(() => setResults([]));
     }, 250);
     return () => window.clearTimeout(timeoutRef.current);
-  }, [query, groupFilter, hasQuery, hasGroupFilter]);
+  }, [query, categorieCode, hasQuery, hasCategory]);
 
   return (
     <div>
       <h1>Nutrition</h1>
       <p className="muted">
-        Recherchez un aliment par nom, ou affinez par groupe / sous-groupe / sous-sous-groupe.
+        Recherchez un aliment par nom, ou affinez par catégorie.
       </p>
 
-      <GroupFilters value={groupFilter} onChange={setGroupFilter} />
+      <CategoryFilter value={categorieCode} onChange={setCategorieCode} />
 
       <input
         type="text"
@@ -66,7 +60,7 @@ export function NutritionPage() {
             <thead>
               <tr>
                 <th>Aliment</th>
-                <th>Groupe</th>
+                <th>Catégorie</th>
                 <th>Protéines (g)</th>
                 <th>Glucides (g)</th>
                 <th>Lipides (g)</th>
@@ -77,7 +71,7 @@ export function NutritionPage() {
               {results.map((aliment) => (
                 <tr key={aliment.code}>
                   <td>{aliment.nom}</td>
-                  <td className="muted">{aliment.groupe}</td>
+                  <td className="muted">{aliment.categorie}</td>
                   <td>{formatValue(aliment.proteines)}</td>
                   <td>{formatValue(aliment.glucides)}</td>
                   <td>{formatValue(aliment.lipides)}</td>

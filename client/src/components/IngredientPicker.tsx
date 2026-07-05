@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { searchAliments } from "../api/aliments";
 import type { Aliment } from "../api/aliments";
 import type { RecipeIngredientInput } from "../api/recipes";
-import { EMPTY_GROUP_FILTER, GroupFilters } from "./GroupFilters";
-import type { GroupFilterValue } from "./GroupFilters";
+import { CategoryFilter } from "./CategoryFilter";
 
 interface PickedIngredient extends RecipeIngredientInput {
   nom: string;
@@ -16,37 +15,33 @@ interface IngredientPickerProps {
 
 export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
   const [query, setQuery] = useState("");
-  const [groupFilter, setGroupFilter] = useState<GroupFilterValue>(EMPTY_GROUP_FILTER);
+  const [categorieCode, setCategorieCode] = useState<number | null>(null);
   const [suggestions, setSuggestions] = useState<Aliment[]>([]);
   const timeoutRef = useRef<number | undefined>(undefined);
 
   const hasQuery = query.trim().length >= 2;
-  const hasGroupFilter = groupFilter.groupeCode !== null;
+  const hasCategory = categorieCode !== null;
 
   useEffect(() => {
     window.clearTimeout(timeoutRef.current);
-    if (!hasQuery && !hasGroupFilter) {
+    if (!hasQuery && !hasCategory) {
       setSuggestions([]);
       return;
     }
     timeoutRef.current = window.setTimeout(() => {
-      searchAliments({
-        q: query.trim(),
-        groupeCode: groupFilter.groupeCode,
-        sousGroupeCode: groupFilter.sousGroupeCode,
-        sousSousGroupeCode: groupFilter.sousSousGroupeCode,
-      })
+      searchAliments({ q: query.trim(), categorieCode })
         .then(({ aliments }) => setSuggestions(aliments))
         .catch(() => setSuggestions([]));
     }, 250);
     return () => window.clearTimeout(timeoutRef.current);
-  }, [query, groupFilter, hasQuery, hasGroupFilter]);
+  }, [query, categorieCode, hasQuery, hasCategory]);
 
   function addIngredient(aliment: Aliment) {
     if (value.some((i) => i.alimentCode === aliment.code)) return;
     onChange([...value, { alimentCode: aliment.code, nom: aliment.nom, quantityG: 100 }]);
-    setQuery("");
-    setSuggestions([]);
+    // Reset complet (texte + catégorie) : sinon, si une catégorie était sélectionnée,
+    // la recherche se relance automatiquement et rouvre la liste de suggestions.
+    resetSearch();
   }
 
   function updateQuantity(alimentCode: number, quantityG: number) {
@@ -59,13 +54,13 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
 
   function resetSearch() {
     setQuery("");
-    setGroupFilter(EMPTY_GROUP_FILTER);
+    setCategorieCode(null);
     setSuggestions([]);
   }
 
   return (
     <div className="ingredient-picker">
-      {(hasQuery || hasGroupFilter) && (
+      {(hasQuery || hasCategory) && (
         <div className="ingredient-picker-toolbar">
           <button type="button" className="link-button" onClick={resetSearch}>
             Réinitialiser la recherche
@@ -73,7 +68,7 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
         </div>
       )}
 
-      <GroupFilters value={groupFilter} onChange={setGroupFilter} />
+      <CategoryFilter value={categorieCode} onChange={setCategorieCode} />
 
       <div className="ingredient-search">
         <input

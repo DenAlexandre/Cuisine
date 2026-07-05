@@ -91,6 +91,20 @@ CREATE TABLE IF NOT EXISTS sous_sous_groupes (
   FOREIGN KEY (groupe_code, sous_groupe_code) REFERENCES sous_groupes(groupe_code, code)
 );
 
+-- Categorisation simplifiee (un seul niveau) utilisee par l'interface, deduite
+-- des groupes techniques ci-dessus par db/import-aliments.ts.
+CREATE TABLE IF NOT EXISTS categories_simples (
+  code INTEGER PRIMARY KEY,
+  nom TEXT NOT NULL
+);
+
+-- La valeur par defaut n'est qu'un filet de securite pour que le ré-import brut
+-- (qui ne renseigne pas cette colonne) ne bute pas sur la contrainte NOT NULL
+-- avant meme la resolution du ON CONFLICT ; CATEGORIZE_ALIMENTS_SQL recalcule
+-- ensuite la vraie categorie de chaque ligne.
+ALTER TABLE aliments ADD COLUMN IF NOT EXISTS categorie_code INTEGER;
+ALTER TABLE aliments ALTER COLUMN categorie_code SET DEFAULT 7;
+
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
   id SERIAL PRIMARY KEY,
   recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,

@@ -2,24 +2,47 @@ import { apiFetch } from "./client";
 
 export type RecipeStatus = "pending" | "approved" | "rejected";
 
+export interface RecipeIngredient {
+  alimentCode: number;
+  nom: string;
+  quantityG: number;
+  proteines: number | null;
+  glucides: number | null;
+  lipides: number | null;
+  energie: number | null;
+}
+
+export interface RecipeNutrition {
+  proteines: number;
+  glucides: number;
+  lipides: number;
+  energie: number;
+}
+
 export interface Recipe {
   id: number;
   title: string;
   description: string;
-  ingredients: string;
   steps: string;
   status: RecipeStatus;
   created_at: string;
   reviewed_at: string | null;
   author_id: number;
   author_username?: string;
+  ingredients: RecipeIngredient[];
+  nutrition: RecipeNutrition;
+}
+
+export interface RecipeIngredientInput {
+  alimentCode: number;
+  quantityG: number;
 }
 
 export interface RecipeInput {
   title: string;
   description: string;
-  ingredients: string;
   steps: string;
+  ingredients: RecipeIngredientInput[];
 }
 
 export function fetchApprovedRecipes() {

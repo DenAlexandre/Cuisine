@@ -23,6 +23,19 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+// Renseigne req.user si un cookie valide est présent, sans exiger d'authentification.
+export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      req.user = verifyToken(token);
+    } catch {
+      // Jeton invalide ou expiré : on continue en tant qu'anonyme.
+    }
+  }
+  next();
+}
+
 export function requireRole(role: "admin" | "user") {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.user?.role !== role) {

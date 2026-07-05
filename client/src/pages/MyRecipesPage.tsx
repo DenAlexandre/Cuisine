@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { createRecipe, deleteRecipe, fetchMyRecipes } from "../api/recipes";
 import type { Recipe } from "../api/recipes";
 import { ApiError } from "../api/client";
+import { IngredientPicker } from "../components/IngredientPicker";
 
 const STATUS_LABELS: Record<Recipe["status"], string> = {
   pending: "En attente",
@@ -11,7 +12,12 @@ const STATUS_LABELS: Record<Recipe["status"], string> = {
   rejected: "Rejetée",
 };
 
-const EMPTY_FORM = { title: "", description: "", ingredients: "", steps: "" };
+const EMPTY_FORM = {
+  title: "",
+  description: "",
+  steps: "",
+  ingredients: [] as { alimentCode: number; quantityG: number; nom: string }[],
+};
 
 export function MyRecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -31,9 +37,23 @@ export function MyRecipesPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (form.ingredients.length === 0) {
+      setError("Ajoutez au moins un ingrédient.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await createRecipe(form);
+      await createRecipe({
+        title: form.title,
+        description: form.description,
+        steps: form.steps,
+        ingredients: form.ingredients.map(({ alimentCode, quantityG }) => ({
+          alimentCode,
+          quantityG,
+        })),
+      });
       setForm(EMPTY_FORM);
       await loadRecipes();
     } catch (err) {
@@ -73,10 +93,9 @@ export function MyRecipesPage() {
           </label>
           <label>
             Ingrédients
-            <textarea
+            <IngredientPicker
               value={form.ingredients}
-              onChange={(e) => setForm({ ...form, ingredients: e.target.value })}
-              required
+              onChange={(ingredients) => setForm({ ...form, ingredients })}
             />
           </label>
           <label>

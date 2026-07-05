@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS recipes (
   id SERIAL PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  ingredients TEXT NOT NULL,
   steps TEXT NOT NULL,
   author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
@@ -45,8 +44,60 @@ CREATE TABLE IF NOT EXISTS recipes (
   reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Le champ "ingredients" en texte libre est remplace par la table recipe_ingredients ci-dessous.
+ALTER TABLE recipes DROP COLUMN IF EXISTS ingredients;
+
 CREATE INDEX IF NOT EXISTS idx_recipes_status ON recipes(status);
 CREATE INDEX IF NOT EXISTS idx_recipes_author ON recipes(author_id);
+
+-- Reference nutritionnelle importee depuis le projet Nutrition (voir db/import-aliments.ts).
+CREATE TABLE IF NOT EXISTS aliments (
+  t_groupe_code INTEGER,
+  t_ss_groupe_code INTEGER,
+  t_ss_ss_groupe_code INTEGER,
+  t_groupe_nom TEXT,
+  t_ss_groupe_nom TEXT,
+  t_ss_ss_groupe_nom TEXT,
+  t_aliment_code INTEGER PRIMARY KEY,
+  t_aliment_nom TEXT NOT NULL,
+  t_proteines NUMERIC,
+  t_glucides NUMERIC,
+  t_lipides NUMERIC,
+  t_energie NUMERIC
+);
+
+-- Groupes/sous-groupes/sous-sous-groupes : deduits des donnees d'aliments par
+-- db/import-aliments.ts, qui ajoute ensuite les FK depuis "aliments" (voir ce fichier).
+CREATE TABLE IF NOT EXISTS groupes (
+  code INTEGER PRIMARY KEY,
+  nom TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sous_groupes (
+  groupe_code INTEGER NOT NULL REFERENCES groupes(code),
+  code INTEGER NOT NULL,
+  nom TEXT NOT NULL,
+  PRIMARY KEY (groupe_code, code)
+);
+
+CREATE TABLE IF NOT EXISTS sous_sous_groupes (
+  groupe_code INTEGER NOT NULL,
+  sous_groupe_code INTEGER NOT NULL,
+  code INTEGER NOT NULL,
+  nom TEXT NOT NULL,
+  PRIMARY KEY (groupe_code, sous_groupe_code, code),
+  FOREIGN KEY (groupe_code, sous_groupe_code) REFERENCES sous_groupes(groupe_code, code)
+);
+
+CREATE TABLE IF NOT EXISTS recipe_ingredients (
+  id SERIAL PRIMARY KEY,
+  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  aliment_code INTEGER NOT NULL REFERENCES aliments(t_aliment_code),
+  quantity_g NUMERIC NOT NULL CHECK (quantity_g > 0),
+  UNIQUE (recipe_id, aliment_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
 `;
 
 async function migrate() {

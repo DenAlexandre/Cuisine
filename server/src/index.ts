@@ -6,6 +6,8 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth";
 import recipeRoutes from "./routes/recipes";
 import adminRoutes from "./routes/admin";
+import alimentRoutes from "./routes/aliments";
+import groupeRoutes from "./routes/groupes";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -18,6 +20,8 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/recipes", recipeRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/aliments", alimentRoutes);
+app.use("/api/groupes", groupeRoutes);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

@@ -37,10 +37,38 @@ export function RecipeDetailPage() {
       <p>{recipe.description}</p>
 
       <h2>Ingrédients</h2>
-      <p className="preformatted">{recipe.ingredients}</p>
+      <ul className="ingredient-list-readonly">
+        {recipe.ingredients.map((ingredient) => (
+          <li key={ingredient.alimentCode}>
+            {ingredient.nom} — {ingredient.quantityG} g
+          </li>
+        ))}
+      </ul>
 
       <h2>Étapes</h2>
       <p className="preformatted">{recipe.steps}</p>
+
+      <h2>Valeurs nutritionnelles</h2>
+      <div className="table-scroll">
+        <table className="nutrition-table">
+          <thead>
+            <tr>
+              <th>Protéines</th>
+              <th>Glucides</th>
+              <th>Lipides</th>
+              <th>Énergie</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{recipe.nutrition.proteines.toFixed(1)} g</td>
+              <td>{recipe.nutrition.glucides.toFixed(1)} g</td>
+              <td>{recipe.nutrition.lipides.toFixed(1)} g</td>
+              <td>{recipe.nutrition.energie.toFixed(0)} kcal</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </article>
   );
 }

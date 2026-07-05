@@ -8,6 +8,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { MyRecipesPage } from "./pages/MyRecipesPage";
 import { AdminPage } from "./pages/AdminPage";
+import { NutritionPage } from "./pages/NutritionPage";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="recettes/:id" element={<RecipeDetailPage />} />
+          <Route path="nutrition" element={<NutritionPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
           <Route

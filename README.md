@@ -30,8 +30,9 @@ cd server
 cp .env.example .env
 # éditez .env : DATABASE_URL, JWT_SECRET, SEED_ADMIN_*
 npm install
-npm run migrate   # crée/met à jour les tables users / recipes
-npm run seed      # crée le compte admin défini dans .env
+npm run migrate         # crée/met à jour les tables users / recipes / aliments
+npm run seed            # crée le compte admin défini dans .env
+npm run import:aliments # importe la base nutritionnelle (~3185 aliments, idempotent)
 ```
 
 ### 2. Serveur + client
@@ -64,6 +65,11 @@ Les configurations sont dans `.vscode/launch.json` et `.vscode/tasks.json`.
   fait avec le pseudo** (pas l'email).
 - Un utilisateur inscrit peut proposer une recette (statut `pending`), voir ses propres soumissions
   (tous statuts) et supprimer/modifier celles encore en attente.
+- Les ingrédients d'une recette sont choisis dans la base **Nutrition** (recherche + quantité en
+  grammes) : les valeurs nutritionnelles (protéines, glucides, lipides, énergie) sont calculées
+  automatiquement et affichées sur la page de la recette.
+- L'onglet **Nutrition** permet de rechercher n'importe quel aliment de cette base (~3185 aliments,
+  valeurs pour 100g), indépendamment des recettes.
 - Un administrateur (compte créé via `npm run seed`) accède à `/admin` pour valider ou rejeter les
   recettes en attente.
 

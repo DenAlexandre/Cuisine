@@ -5,6 +5,7 @@ import type { Recipe } from "../api/recipes";
 import { RECIPE_CATEGORIES } from "../constants/recipeCategories";
 import { useSortableTable } from "../hooks/useSortableTable";
 import { SortableTh } from "../components/SortableTh";
+import { useAuth } from "../context/AuthContext";
 
 function categoryLabel(category: Recipe["category"]) {
   const meta = RECIPE_CATEGORIES.find((c) => c.value === category);
@@ -39,6 +40,7 @@ const STATUS_LABELS: Record<Recipe["status"], string> = {
 };
 
 export function MyRecipesPage() {
+  const { user } = useAuth();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<Recipe[]>([]);
@@ -59,9 +61,15 @@ export function MyRecipesPage() {
   }
 
   useEffect(() => {
-    loadRecipes().finally(() => setLoading(false));
+    // "Mes soumissions" n'a pas de sens pour un admin : ses recettes créées
+    // sont auto-approuvées, pas de statut de validation à suivre ici.
+    if (user?.role !== "admin") {
+      loadRecipes().finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
     loadFavorites().finally(() => setFavoritesLoading(false));
-  }, []);
+  }, [user]);
 
   async function handleRemoveFavorite(id: number) {
     await removeFavorite(id);
@@ -127,24 +135,26 @@ export function MyRecipesPage() {
         )}
       </section>
 
-      <section>
-        <h2>Mes soumissions</h2>
-        {loading && <p>Chargement...</p>}
-        {!loading && recipes.length === 0 && <p>Vous n'avez pas encore proposé de recette.</p>}
-        <ul className="my-recipes-list">
-          {recipes.map((recipe) => (
-            <li key={recipe.id}>
-              <Link to={`/recettes/${recipe.id}`}>{recipe.title}</Link>
-              <span className={`status-badge status-${recipe.status}`}>
-                {STATUS_LABELS[recipe.status]}
-              </span>
-              {recipe.status === "pending" && (
-                <button onClick={() => handleDelete(recipe.id)}>Supprimer</button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+      {user?.role !== "admin" && (
+        <section>
+          <h2>Mes soumissions</h2>
+          {loading && <p>Chargement...</p>}
+          {!loading && recipes.length === 0 && <p>Vous n'avez pas encore proposé de recette.</p>}
+          <ul className="my-recipes-list">
+            {recipes.map((recipe) => (
+              <li key={recipe.id}>
+                <Link to={`/recettes/${recipe.id}`}>{recipe.title}</Link>
+                <span className={`status-badge status-${recipe.status}`}>
+                  {STATUS_LABELS[recipe.status]}
+                </span>
+                {recipe.status === "pending" && (
+                  <button onClick={() => handleDelete(recipe.id)}>Supprimer</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

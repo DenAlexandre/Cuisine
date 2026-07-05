@@ -87,13 +87,14 @@ export function AdminSystemPage() {
       </section>
 
       <section className="create-recipe">
-        <h2>Export de la base de données</h2>
+        <h2>Export des données</h2>
         <p className="muted">
-          Génère un export complet (schéma + données) de la base au format .sql, téléchargé
-          directement dans le navigateur.
+          Génère un export des données (utilisateurs, recettes, aliments...) au format .sql,
+          téléchargé directement dans le navigateur. Suppose un schéma déjà à jour (installé via
+          les migrations) : ce fichier contient les données, pas la structure des tables.
         </p>
         <button type="button" onClick={handleExport} disabled={exporting}>
-          {exporting ? "Export en cours..." : "Exporter la base (.sql)"}
+          {exporting ? "Export en cours..." : "Exporter les données (.sql)"}
         </button>
         {exportError && <p className="error">{exportError}</p>}
       </section>

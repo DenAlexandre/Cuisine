@@ -1,7 +1,5 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import { z } from "zod";
 import { pool } from "../db/pool";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -11,34 +9,68 @@ const router = Router();
 
 router.use(requireAuth, requireRole("admin"));
 
-const execFileAsync = promisify(execFile);
+// Ordre de dépendance (FK) : une table ne référence que des tables listées avant elle.
+const EXPORT_TABLES = [
+  "categories_simples",
+  "groupes",
+  "sous_groupes",
+  "sous_sous_groupes",
+  "aliments",
+  "users",
+  "recipes",
+  "recipe_ingredients",
+  "favorites",
+  "weight_entries",
+  "system_settings",
+];
 
-// Même conteneur que scripts/start-db.ps1 (par défaut "cuisine-db") : pg_dump
-// tourne à l'intérieur du conteneur pour ne pas dépendre d'un client
-// PostgreSQL installé sur la machine qui héberge le serveur Node.
-const DB_CONTAINER_NAME = process.env.DB_CONTAINER_NAME || "cuisine-db";
-
-function parseDatabaseUrl(databaseUrl: string) {
-  const url = new URL(databaseUrl);
-  return {
-    user: decodeURIComponent(url.username),
-    database: url.pathname.replace(/^\//, ""),
-  };
+function sqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (Buffer.isBuffer(value)) return value.length === 0 ? "''" : `'\\x${value.toString("hex")}'`;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (value instanceof Date) return `'${value.toISOString()}'`;
+  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-// Export complet de la base en .sql (schéma + données), via pg_dump.
+// Export des données en .sql, généré ligne par ligne via des requêtes SQL
+// classiques plutôt que pg_dump : ça fonctionne à l'identique en local (Docker)
+// et une fois déployé (Neon, Render...), sans dépendre d'un binaire pg_dump ou
+// d'un accès Docker qui n'existe pas forcément dans l'environnement d'hébergement.
+// Suppose que le schéma est déjà en place (via "npm run migrate") : ce n'est pas
+// un remplacement de pg_dump, seulement une sauvegarde des données.
 router.get("/export-sql", async (_req, res) => {
-  const { user, database } = parseDatabaseUrl(process.env.DATABASE_URL!);
   try {
-    const { stdout } = await execFileAsync(
-      "docker",
-      ["exec", DB_CONTAINER_NAME, "pg_dump", "-U", user, database],
-      { maxBuffer: 200 * 1024 * 1024 }
-    );
+    const parts: string[] = [
+      "-- Export des données Cuisine (généré par l'application).",
+      "-- Suppose un schéma déjà à jour (npm run migrate) : ne contient pas les CREATE TABLE.",
+      "",
+    ];
+
+    for (const table of EXPORT_TABLES) {
+      const result = await pool.query(`SELECT * FROM ${table}`);
+      if (result.rows.length === 0) continue;
+
+      const columns = result.fields.map((f) => f.name);
+      parts.push(`-- ${table} (${result.rows.length} ligne${result.rows.length > 1 ? "s" : ""})`);
+      for (const row of result.rows) {
+        const values = columns.map((col) => sqlLiteral(row[col]));
+        parts.push(`INSERT INTO ${table} (${columns.join(", ")}) VALUES (${values.join(", ")});`);
+      }
+
+      if (columns.includes("id")) {
+        parts.push(
+          `SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM ${table}), 1));`
+        );
+      }
+      parts.push("");
+    }
+
+    const sql = parts.join("\n");
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     res.setHeader("Content-Type", "application/sql; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="cuisine-export-${timestamp}.sql"`);
-    res.send(stdout);
+    res.send(sql);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
     res.status(500).json({ error: `Échec de l'export SQL : ${message}` });

@@ -91,6 +91,10 @@ export function fetchApprovedRecipes(category?: RecipeCategory) {
   return apiFetch<{ recipes: Recipe[] }>(`/recipes${query}`);
 }
 
+export function fetchRecipeCounts() {
+  return apiFetch<{ counts: Record<RecipeCategory, number> }>("/recipes/counts");
+}
+
 export function fetchRecipe(id: number | string) {
   return apiFetch<{ recipe: Recipe }>(`/recipes/${id}`);
 }

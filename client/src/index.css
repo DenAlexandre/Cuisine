@@ -394,6 +394,15 @@ textarea {
   font-weight: 600;
 }
 
+.category-tile-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  background: rgba(255, 255, 255, 0.25);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
 /* ---------- Recipes ---------- */
 
 .recipe-grid {

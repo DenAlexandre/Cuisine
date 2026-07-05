@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { addFavorite, fetchApprovedRecipes, getRecipePhotoUrl, removeFavorite } from "../api/recipes";
+import {
+  addFavorite,
+  fetchApprovedRecipes,
+  fetchRecipeCounts,
+  getRecipePhotoUrl,
+  removeFavorite,
+} from "../api/recipes";
 import type { Recipe, RecipeCategory } from "../api/recipes";
 import { RECIPE_CATEGORIES } from "../constants/recipeCategories";
 import { CategoryThumbnail } from "../components/CategoryThumbnail";
@@ -30,12 +36,20 @@ export function HomePage() {
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState<Record<RecipeCategory, number> | null>(null);
 
   useEffect(() => {
     setLoading(true);
     fetchApprovedRecipes(activeCategory?.value)
       .then(({ recipes }) => setRecipes(recipes))
       .finally(() => setLoading(false));
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory) return;
+    fetchRecipeCounts()
+      .then(({ counts }) => setCounts(counts))
+      .catch(() => setCounts(null));
   }, [activeCategory]);
 
   async function toggleFavorite(e: MouseEvent, recipe: Recipe) {
@@ -73,6 +87,7 @@ export function HomePage() {
             >
               <span className="category-tile-emoji">{c.emoji}</span>
               <span className="category-tile-label">{c.label}</span>
+              {counts && <span className="category-tile-count">{counts[c.value]}</span>}
             </Link>
           ))}
         </div>

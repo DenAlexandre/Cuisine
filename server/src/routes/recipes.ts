@@ -306,6 +306,21 @@ router.get("/favorites", requireAuth, async (req, res) => {
   res.json({ recipes: withIngredients.map((r) => ({ ...r, isFavorite: true })) });
 });
 
+// Nombre de recettes approuvées par catégorie (page d'accueil, tuiles de
+// catégories) : évite de charger la liste complète de chaque catégorie juste
+// pour un compteur. Doit rester déclarée avant "/:id" pour ne pas être
+// interprétée comme un id de recette.
+router.get("/counts", async (_req, res) => {
+  const result = await pool.query<{ category: string; count: string }>(
+    `SELECT category, COUNT(*)::int AS count FROM recipes WHERE status = 'approved' GROUP BY category`
+  );
+  const counts = Object.fromEntries(RECIPE_CATEGORIES.map((c) => [c, 0]));
+  for (const row of result.rows) {
+    counts[row.category] = Number(row.count);
+  }
+  res.json({ counts });
+});
+
 // Sert la photo binaire d'une recette (indépendant de RECIPE_FIELDS, qui n'expose
 // que le booléen "hasPhoto" pour ne pas alourdir les listes).
 router.get("/:id/photo", async (req, res) => {

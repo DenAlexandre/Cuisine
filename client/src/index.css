@@ -964,7 +964,8 @@ textarea {
 
 /* ---------- Nutrition ---------- */
 
-.nutrition-search {
+.nutrition-search,
+.recipe-search {
   width: 100%;
   max-width: 420px;
   margin-bottom: 24px;

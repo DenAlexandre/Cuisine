@@ -37,13 +37,20 @@ export function HomePage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState<Record<RecipeCategory, number> | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     setLoading(true);
+    setSearch("");
     fetchApprovedRecipes(activeCategory?.value)
       .then(({ recipes }) => setRecipes(recipes))
       .finally(() => setLoading(false));
   }, [activeCategory]);
+
+  const query = search.trim().toLowerCase();
+  const filteredRecipes = query
+    ? recipes.filter((recipe) => recipe.title.toLowerCase().includes(query))
+    : recipes;
 
   useEffect(() => {
     if (activeCategory) return;
@@ -113,12 +120,25 @@ export function HomePage() {
         )}
       </div>
 
+      {!loading && recipes.length > 0 && (
+        <input
+          type="text"
+          placeholder="Rechercher une recette par son nom..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="recipe-search"
+        />
+      )}
+
       {loading && <p>Chargement des recettes...</p>}
       {!loading && recipes.length === 0 && (
         <p>Aucune recette publiée dans cette catégorie pour le moment.</p>
       )}
+      {!loading && recipes.length > 0 && filteredRecipes.length === 0 && (
+        <p>Aucune recette ne correspond à « {search} ».</p>
+      )}
       <div className="recipe-grid">
-        {recipes.map((recipe) => (
+        {filteredRecipes.map((recipe) => (
           <Link key={recipe.id} to={`/recettes/${recipe.id}`} className="recipe-card">
             {recipe.hasPhoto ? (
               <img

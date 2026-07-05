@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { searchAliments } from "../api/aliments";
 import type { Aliment } from "../api/aliments";
-import type { RecipeIngredientInput, RecipeIngredientUnit } from "../api/recipes";
+import type { RecipeCategory, RecipeIngredientInput, RecipeIngredientUnit } from "../api/recipes";
 import { CategoryFilter } from "./CategoryFilter";
 
 interface PickedIngredient extends RecipeIngredientInput {
@@ -12,20 +12,39 @@ interface PickedIngredient extends RecipeIngredientInput {
 interface IngredientPickerProps {
   value: PickedIngredient[];
   onChange: (ingredients: PickedIngredient[]) => void;
+  recipeCategory: RecipeCategory;
 }
 
 function unitFor(aliment: Aliment): RecipeIngredientUnit {
   return aliment.categorie === "Boissons" ? "cl" : "g";
 }
 
-export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
+// Code de la catégorie simplifiée "Boissons" (voir import-aliments.ts) : un
+// cocktail se compose presque toujours de boissons, on pré-filtre dessus.
+const BOISSONS_CATEGORY_CODE = 8;
+
+function defaultCategorieCode(recipeCategory: RecipeCategory): number | null {
+  return recipeCategory === "cocktail" ? BOISSONS_CATEGORY_CODE : null;
+}
+
+export function IngredientPicker({ value, onChange, recipeCategory }: IngredientPickerProps) {
   const [query, setQuery] = useState("");
-  const [categorieCode, setCategorieCode] = useState<number | null>(null);
+  const [categorieCode, setCategorieCode] = useState<number | null>(() =>
+    defaultCategorieCode(recipeCategory)
+  );
+  const [categoryTouched, setCategoryTouched] = useState(false);
   const [suggestions, setSuggestions] = useState<Aliment[]>([]);
   const timeoutRef = useRef<number | undefined>(undefined);
 
   const hasQuery = query.trim().length >= 2;
   const hasCategory = categorieCode !== null;
+
+  // Tant que l'utilisateur n'a pas choisi lui-même une catégorie d'aliment,
+  // le filtre continue de suivre la catégorie de recette (cocktail -> Boissons).
+  useEffect(() => {
+    if (categoryTouched) return;
+    setCategorieCode(defaultCategorieCode(recipeCategory));
+  }, [recipeCategory, categoryTouched]);
 
   useEffect(() => {
     window.clearTimeout(timeoutRef.current);
@@ -61,7 +80,8 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
 
   function resetSearch() {
     setQuery("");
-    setCategorieCode(null);
+    setCategoryTouched(false);
+    setCategorieCode(defaultCategorieCode(recipeCategory));
     setSuggestions([]);
   }
 
@@ -75,7 +95,13 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
         </div>
       )}
 
-      <CategoryFilter value={categorieCode} onChange={setCategorieCode} />
+      <CategoryFilter
+        value={categorieCode}
+        onChange={(code) => {
+          setCategoryTouched(true);
+          setCategorieCode(code);
+        }}
+      />
 
       <div className="ingredient-search">
         <input

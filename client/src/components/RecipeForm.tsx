@@ -144,6 +144,7 @@ export function RecipeForm({ initial, initialCategory = "plat", submitLabel, onS
         <IngredientPicker
           value={form.ingredients}
           onChange={(ingredients) => setForm({ ...form, ingredients })}
+          recipeCategory={form.category}
         />
       </label>
       <label>

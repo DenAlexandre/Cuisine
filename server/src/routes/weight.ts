@@ -46,4 +46,23 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json({ entry: result.rows[0] });
 });
 
+// Supprime tout l'historique de l'utilisateur connecté. Doit être déclarée avant
+// "/:id" pour ne pas être interprétée comme un id.
+router.delete("/", requireAuth, async (req, res) => {
+  await pool.query("DELETE FROM weight_entries WHERE user_id = $1", [req.user!.id]);
+  res.status(204).send();
+});
+
+// Supprime une pesée précise, uniquement si elle appartient à l'utilisateur connecté.
+router.delete("/:id", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    "DELETE FROM weight_entries WHERE id = $1 AND user_id = $2",
+    [req.params.id, req.user!.id]
+  );
+  if (!result.rowCount) {
+    return res.status(404).json({ error: "Entrée introuvable." });
+  }
+  res.status(204).send();
+});
+
 export default router;

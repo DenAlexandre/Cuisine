@@ -1,11 +1,32 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { fetchPendingRecipes } from "../api/recipes";
+
+const PENDING_POLL_INTERVAL_MS = 30_000;
 
 export function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const refreshPendingCount = useCallback(() => {
+    if (user?.role !== "admin") return;
+    fetchPendingRecipes()
+      .then(({ recipes }) => setPendingCount(recipes.length))
+      .catch(() => {});
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== "admin") {
+      setPendingCount(0);
+      return;
+    }
+    refreshPendingCount();
+    const interval = setInterval(refreshPendingCount, PENDING_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user?.role, refreshPendingCount]);
 
   function handleLogout() {
     logout();
@@ -43,8 +64,18 @@ export function Layout() {
             </NavLink>
           )}
           {user?.role === "admin" && (
-            <NavLink to="/admin" onClick={closeMenu}>
+            <NavLink to="/admin" onClick={closeMenu} className="nav-link-with-badge">
               Validations
+              {pendingCount > 0 && (
+                <span className="nav-badge" title={`${pendingCount} recette(s) en attente de validation`}>
+                  {pendingCount}
+                </span>
+              )}
+            </NavLink>
+          )}
+          {user?.role === "admin" && (
+            <NavLink to="/admin/utilisateurs" onClick={closeMenu}>
+              Utilisateurs
             </NavLink>
           )}
         </nav>
@@ -90,7 +121,7 @@ export function Layout() {
           </Link>
         </header>
         <main>
-          <Outlet />
+          <Outlet context={{ refreshPendingCount }} />
         </main>
       </div>
     </div>

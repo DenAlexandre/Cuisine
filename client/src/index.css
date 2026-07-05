@@ -120,6 +120,28 @@ a {
   color: var(--accent-dark);
 }
 
+.sidebar nav a.nav-link-with-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nav-badge {
+  background: #d1435b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
 .auth-actions {
   display: flex;
   flex-direction: column;
@@ -570,6 +592,7 @@ textarea {
 .imc-form,
 .weight-entry-form {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 16px;
@@ -631,12 +654,26 @@ textarea {
   opacity: 0.7;
 }
 
-.imc-save {
+.imc-save-status {
   margin-top: 20px;
+}
+
+.weight-chart {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 16px 10px;
+  margin: 16px 0 24px;
+}
+
+.weight-chart-labels {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.7;
+  padding: 0 8px;
+  margin-top: 4px;
 }
 
 .photo-field {
@@ -645,20 +682,61 @@ textarea {
   gap: 10px;
 }
 
-.photo-preview {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.photo-preview img {
+.photo-field-preview {
+  position: relative;
+  display: block;
   width: 100%;
   max-width: 320px;
   aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 10px;
+  padding: 0;
   border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: none;
+}
+
+.photo-field-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-field-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 6px 0;
+  background: rgba(43, 31, 26, 0.65);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.photo-field-preview:hover .photo-field-overlay,
+.photo-field-preview:focus-visible .photo-field-overlay {
+  opacity: 1;
+}
+
+.photo-field-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.category-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.category-thumbnail span {
+  font-size: 40px;
+  line-height: 1;
 }
 
 .recipe-photo {

@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useAuth } from "../context/AuthContext";
-import { addWeightEntry, fetchWeightHistory } from "../api/weight";
+import {
+  addWeightEntry,
+  deleteAllWeightEntries,
+  deleteWeightEntry,
+  fetchWeightHistory,
+} from "../api/weight";
 import type { WeightEntry } from "../api/weight";
 import { calculateBmi, classifyBmi } from "../utils/bmi";
 import type { BmiCategory } from "../utils/bmi";
+import { WeightChart } from "../components/WeightChart";
 
 const GAUGE_MIN = 15;
 const GAUGE_MAX = 40;
@@ -20,14 +25,13 @@ function formatDateTime(iso: string) {
 }
 
 export function ImcPage() {
-  const { user } = useAuth();
-
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
   const [result, setResult] = useState<{ bmi: number; category: BmiCategory } | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Dernière taille connue (déduite de l'historique), réutilisée pour recalculer
+  // l'IMC quand on saisit juste un poids sans repasser par le formulaire du haut.
+  const [lastKnownHeight, setLastKnownHeight] = useState<number | null>(null);
 
   const [todayWeight, setTodayWeight] = useState("");
   const [history, setHistory] = useState<WeightEntry[]>([]);
@@ -36,41 +40,40 @@ export function ImcPage() {
   const [submittingWeight, setSubmittingWeight] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      setHistoryLoading(false);
-      return;
-    }
     fetchWeightHistory()
-      .then(({ entries }) => setHistory(entries))
+      .then(({ entries }) => {
+        setHistory(entries);
+        // Pré-remplit le formulaire avec la dernière taille connue et le dernier
+        // poids saisi, et affiche directement le résultat sans attendre un clic.
+        const mostRecentWithHeight = entries.find((entry) => entry.heightCm != null);
+        const lastHeight = mostRecentWithHeight?.heightCm ?? null;
+        const lastWeight = entries[0]?.weightKg ?? null;
+
+        if (lastHeight != null) {
+          setLastKnownHeight(lastHeight);
+          setHeight(String(lastHeight));
+        }
+        if (lastWeight != null) {
+          setWeight(String(lastWeight));
+        }
+        if (lastHeight != null && lastWeight != null) {
+          const bmi = calculateBmi(lastWeight, lastHeight);
+          setResult({ bmi, category: classifyBmi(bmi) });
+        }
+      })
       .finally(() => setHistoryLoading(false));
-  }, [user]);
+  }, []);
 
   function handleCalculate(e: FormEvent) {
     e.preventDefault();
     const w = Number(weight);
     const h = Number(height);
     if (!w || !h) return;
+    // Calcul de prévisualisation uniquement : n'enregistre rien dans le suivi.
+    // Seul "Entrer mon poids aujourd'hui" ajoute une ligne à l'historique.
     const bmi = calculateBmi(w, h);
     setResult({ bmi, category: classifyBmi(bmi) });
-    setSaved(false);
-    setSaveError(null);
-  }
-
-  async function handleSaveCalculation() {
-    const w = Number(weight);
-    const h = Number(height);
-    if (!w || !h) return;
-    setSaveError(null);
-    setSaving(true);
-    try {
-      const { entry } = await addWeightEntry(w, h);
-      setHistory((prev) => [entry, ...prev]);
-      setSaved(true);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement.");
-    } finally {
-      setSaving(false);
-    }
+    setLastKnownHeight(h);
   }
 
   async function handleAddWeight(e: FormEvent) {
@@ -80,13 +83,42 @@ export function ImcPage() {
     setWeightError(null);
     setSubmittingWeight(true);
     try {
-      const { entry } = await addWeightEntry(w);
+      const { entry } = await addWeightEntry(w, lastKnownHeight);
       setHistory((prev) => [entry, ...prev]);
       setTodayWeight("");
+      setWeight(String(w));
+      // Taille déjà connue : on refait le calcul d'IMC et on l'affiche sur la jauge.
+      if (entry.bmi != null) {
+        setResult({ bmi: entry.bmi, category: classifyBmi(entry.bmi) });
+      }
     } catch (err) {
       setWeightError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement.");
     } finally {
       setSubmittingWeight(false);
+    }
+  }
+
+  async function handleDeleteEntry(id: number) {
+    if (!window.confirm("Supprimer cette pesée ?")) return;
+    setWeightError(null);
+    try {
+      await deleteWeightEntry(id);
+      setHistory((prev) => prev.filter((entry) => entry.id !== id));
+    } catch (err) {
+      setWeightError(err instanceof Error ? err.message : "Erreur lors de la suppression.");
+    }
+  }
+
+  async function handleDeleteAll() {
+    if (!window.confirm("Supprimer tout le suivi du poids ? Cette action est irréversible.")) {
+      return;
+    }
+    setWeightError(null);
+    try {
+      await deleteAllWeightEntries();
+      setHistory([]);
+    } catch (err) {
+      setWeightError(err instanceof Error ? err.message : "Erreur lors de la suppression.");
     }
   }
 
@@ -162,61 +194,63 @@ export function ImcPage() {
               <span>{GAUGE_MAX}+</span>
             </div>
 
-            {user ? (
-              <div className="imc-save">
-                <button type="button" onClick={handleSaveCalculation} disabled={saving || saved}>
-                  {saved ? "Enregistré ✓" : "Enregistrer ce calcul dans mon historique"}
-                </button>
-                {saveError && <p className="error">{saveError}</p>}
-              </div>
-            ) : (
-              <p className="muted">Connectez-vous pour enregistrer ce calcul dans votre historique.</p>
-            )}
+            <p className="muted imc-save-status">
+              Ce calcul n'est pas enregistré automatiquement — utilisez « Entrer mon poids
+              aujourd'hui » ci-dessous pour l'ajouter à votre suivi.
+            </p>
           </div>
         )}
       </section>
 
       <section>
-        <h2>Suivi du poids</h2>
-        {!user && (
-          <p className="muted">Connectez-vous pour enregistrer et suivre votre poids dans le temps.</p>
-        )}
-        {user && (
-          <>
-            <form onSubmit={handleAddWeight} className="weight-entry-form">
-              <label>
-                Mon poids aujourd'hui (kg)
-                <input
-                  type="number"
-                  min={1}
-                  step="0.1"
-                  value={todayWeight}
-                  onChange={(e) => setTodayWeight(e.target.value)}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={submittingWeight}>
-                Entrer mon poids aujourd'hui
-              </button>
-            </form>
-            {weightError && <p className="error">{weightError}</p>}
+        <div className="page-header">
+          <h2>Suivi du poids</h2>
+          {history.length > 0 && (
+            <button type="button" className="danger" onClick={handleDeleteAll}>
+              Supprimer le suivi
+            </button>
+          )}
+        </div>
 
-            {historyLoading && <p>Chargement de l'historique...</p>}
-            {!historyLoading && history.length === 0 && (
-              <p>Aucune pesée enregistrée pour le moment.</p>
-            )}
-            {history.length > 0 && (
-              <ul className="my-recipes-list">
-                {history.map((entry) => (
-                  <li key={entry.id}>
-                    <span>{formatDateTime(entry.recordedAt)}</span>
-                    <span>{entry.weightKg} kg</span>
-                    {entry.bmi != null && <span className="muted">IMC : {entry.bmi.toFixed(1)}</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
+        <form onSubmit={handleAddWeight} className="weight-entry-form">
+          <label>
+            Mon poids aujourd'hui (kg)
+            <input
+              type="number"
+              min={1}
+              step="0.1"
+              value={todayWeight}
+              onChange={(e) => setTodayWeight(e.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" disabled={submittingWeight}>
+            Entrer mon poids aujourd'hui
+          </button>
+        </form>
+        {weightError && <p className="error">{weightError}</p>}
+
+        <WeightChart entries={history} />
+
+        {historyLoading && <p>Chargement de l'historique...</p>}
+        {!historyLoading && history.length === 0 && <p>Aucune pesée enregistrée pour le moment.</p>}
+        {history.length > 0 && (
+          <ul className="my-recipes-list">
+            {history.map((entry) => (
+              <li key={entry.id}>
+                <span>{formatDateTime(entry.recordedAt)}</span>
+                <span>{entry.weightKg} kg</span>
+                {entry.bmi != null && <span className="muted">IMC : {entry.bmi.toFixed(1)}</span>}
+                <button
+                  type="button"
+                  className="link-button danger-link"
+                  onClick={() => handleDeleteEntry(entry.id)}
+                >
+                  Supprimer
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

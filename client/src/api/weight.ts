@@ -18,3 +18,11 @@ export function addWeightEntry(weightKg: number, heightCm?: number | null) {
     body: JSON.stringify({ weightKg, heightCm: heightCm ?? null }),
   });
 }
+
+export function deleteWeightEntry(id: number) {
+  return apiFetch<void>(`/weight/${id}`, { method: "DELETE" });
+}
+
+export function deleteAllWeightEntries() {
+  return apiFetch<void>("/weight", { method: "DELETE" });
+}

@@ -10,6 +10,7 @@ import { MyRecipesPage } from "./pages/MyRecipesPage";
 import { NewRecipePage } from "./pages/NewRecipePage";
 import { EditRecipePage } from "./pages/EditRecipePage";
 import { AdminPage } from "./pages/AdminPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { NutritionPage } from "./pages/NutritionPage";
 import { ImcPage } from "./pages/ImcPage";
 
@@ -67,6 +68,14 @@ function App() {
             element={
               <AdminRoute>
                 <AdminPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="admin/utilisateurs"
+            element={
+              <AdminRoute>
+                <AdminUsersPage />
               </AdminRoute>
             }
           />

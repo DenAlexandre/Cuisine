@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { approveRecipe, deleteRecipe, fetchPendingRecipes, rejectRecipe } from "../api/recipes";
 import type { Recipe } from "../api/recipes";
+
+interface LayoutContext {
+  refreshPendingCount: () => void;
+}
 
 export function AdminPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const { refreshPendingCount } = useOutletContext<LayoutContext>();
 
   function loadRecipes() {
     return fetchPendingRecipes().then(({ recipes }) => setRecipes(recipes));
@@ -18,17 +23,20 @@ export function AdminPage() {
   async function handleApprove(id: number) {
     await approveRecipe(id);
     await loadRecipes();
+    refreshPendingCount();
   }
 
   async function handleReject(id: number) {
     await rejectRecipe(id);
     await loadRecipes();
+    refreshPendingCount();
   }
 
   async function handleDelete(recipe: Recipe) {
     if (!window.confirm(`Supprimer « ${recipe.title} » ?`)) return;
     await deleteRecipe(recipe.id);
     await loadRecipes();
+    refreshPendingCount();
   }
 
   if (loading) return <p>Chargement...</p>;

@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { addFavorite, fetchApprovedRecipes, getRecipePhotoUrl, removeFavorite } from "../api/recipes";
 import type { Recipe, RecipeCategory } from "../api/recipes";
 import { RECIPE_CATEGORIES } from "../constants/recipeCategories";
+import { CategoryThumbnail } from "../components/CategoryThumbnail";
 import { useAuth } from "../context/AuthContext";
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -91,7 +92,7 @@ export function HomePage() {
           </h1>
         </div>
         {user && (
-          <Link to="/nouvelle-recette" className="button-link">
+          <Link to={`/nouvelle-recette?categorie=${activeCategory.value}`} className="button-link">
             Ajouter une recette
           </Link>
         )}
@@ -104,12 +105,14 @@ export function HomePage() {
       <div className="recipe-grid">
         {recipes.map((recipe) => (
           <Link key={recipe.id} to={`/recettes/${recipe.id}`} className="recipe-card">
-            {recipe.hasPhoto && (
+            {recipe.hasPhoto ? (
               <img
                 src={getRecipePhotoUrl(recipe.id)}
                 alt={recipe.title}
                 className="recipe-card-photo"
               />
+            ) : (
+              <CategoryThumbnail category={recipe.category} className="recipe-card-photo" />
             )}
             {user && (
               <button

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { deleteRecipe, fetchRecipe, getRecipePhotoUrl } from "../api/recipes";
 import type { Recipe } from "../api/recipes";
 import { ApiError } from "../api/client";
+import { CategoryThumbnail } from "../components/CategoryThumbnail";
 import { useAuth } from "../context/AuthContext";
 
 const STATUS_LABELS: Record<Recipe["status"], string> = {
@@ -57,12 +58,10 @@ export function RecipeDetailPage() {
           </div>
         )}
       </div>
-      {recipe.hasPhoto && (
-        <img
-          src={getRecipePhotoUrl(recipe.id)}
-          alt={recipe.title}
-          className="recipe-photo"
-        />
+      {recipe.hasPhoto ? (
+        <img src={getRecipePhotoUrl(recipe.id)} alt={recipe.title} className="recipe-photo" />
+      ) : (
+        <CategoryThumbnail category={recipe.category} className="recipe-photo" />
       )}
       {recipe.status !== "approved" && (
         <p className={`status-badge status-${recipe.status}`}>{STATUS_LABELS[recipe.status]}</p>

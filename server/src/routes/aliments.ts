@@ -1,5 +1,7 @@
 import { Router } from "express";
+import { z } from "zod";
 import { pool } from "../db/pool";
+import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -7,6 +9,7 @@ const ALIMENT_FIELDS = `
   a.t_aliment_code AS code,
   a.t_aliment_nom AS nom,
   c.nom AS categorie,
+  a.categorie_code AS "categorieCode",
   a.t_proteines::float8 AS proteines,
   a.t_glucides::float8 AS glucides,
   a.t_lipides::float8 AS lipides,
@@ -18,10 +21,31 @@ const ALIMENT_JOINS = `
   LEFT JOIN categories_simples c ON c.code = a.categorie_code
 `;
 
+const alimentSchema = z.object({
+  nom: z.string().min(1, "Le nom est requis.").max(255),
+  categorieCode: z.number().int(),
+  proteines: z.number().nonnegative().nullable(),
+  glucides: z.number().nonnegative().nullable(),
+  lipides: z.number().nonnegative().nullable(),
+  energie: z.number().nonnegative().nullable(),
+});
+
 function parseIntParam(value: unknown): number | null {
   if (typeof value !== "string" || value.trim() === "") return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) ? parsed : null;
+}
+
+async function fetchAlimentByCode(code: number) {
+  const result = await pool.query(
+    `SELECT ${ALIMENT_FIELDS} ${ALIMENT_JOINS} WHERE a.t_aliment_code = $1`,
+    [code]
+  );
+  return result.rows[0] ?? null;
+}
+
+function isForeignKeyViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && err.code === "23503";
 }
 
 // La recherche texte est utilisable seule, tout comme le filtre de catégorie seul :
@@ -54,6 +78,68 @@ router.get("/", async (req, res) => {
     params
   );
   res.json({ aliments: result.rows });
+});
+
+// Création d'un aliment (admin uniquement). Le code est généré automatiquement
+// dans une plage dédiée qui ne recoupe jamais les codes CIQUAL importés.
+router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
+  const parsed = alimentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const { nom, categorieCode, proteines, glucides, lipides, energie } = parsed.data;
+
+  const result = await pool.query(
+    `INSERT INTO aliments (t_aliment_code, t_aliment_nom, categorie_code, t_proteines, t_glucides, t_lipides, t_energie)
+     VALUES (nextval('aliments_custom_code_seq'), $1, $2, $3, $4, $5, $6)
+     RETURNING t_aliment_code`,
+    [nom, categorieCode, proteines, glucides, lipides, energie]
+  );
+
+  const aliment = await fetchAlimentByCode(result.rows[0].t_aliment_code);
+  res.status(201).json({ aliment });
+});
+
+// Modification d'un aliment existant (admin uniquement, CIQUAL ou personnalisé).
+router.put("/:code", requireAuth, requireRole("admin"), async (req, res) => {
+  const parsed = alimentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const { nom, categorieCode, proteines, glucides, lipides, energie } = parsed.data;
+
+  const result = await pool.query(
+    `UPDATE aliments
+     SET t_aliment_nom = $1, categorie_code = $2, t_proteines = $3, t_glucides = $4, t_lipides = $5, t_energie = $6
+     WHERE t_aliment_code = $7`,
+    [nom, categorieCode, proteines, glucides, lipides, energie, req.params.code]
+  );
+  if (!result.rowCount) {
+    return res.status(404).json({ error: "Aliment introuvable." });
+  }
+
+  const aliment = await fetchAlimentByCode(Number(req.params.code));
+  res.json({ aliment });
+});
+
+// Suppression (admin uniquement). Refusée si l'aliment est utilisé dans une recette.
+router.delete("/:code", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const result = await pool.query("DELETE FROM aliments WHERE t_aliment_code = $1", [
+      req.params.code,
+    ]);
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Aliment introuvable." });
+    }
+    res.status(204).send();
+  } catch (err) {
+    if (isForeignKeyViolation(err)) {
+      return res.status(409).json({
+        error: "Cet aliment est utilisé dans une ou plusieurs recettes et ne peut pas être supprimé.",
+      });
+    }
+    throw err;
+  }
 });
 
 export default router;

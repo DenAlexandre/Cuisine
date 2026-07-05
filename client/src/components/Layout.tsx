@@ -37,7 +37,7 @@ export function Layout() {
           )}
           {user?.role === "admin" && (
             <NavLink to="/admin" onClick={closeMenu}>
-              Administration
+              Validations
             </NavLink>
           )}
         </nav>

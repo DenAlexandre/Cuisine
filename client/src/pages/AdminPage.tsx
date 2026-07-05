@@ -31,14 +31,14 @@ export function AdminPage() {
     <div>
       <h1>Recettes en attente de validation</h1>
       {recipes.length === 0 && <p>Aucune recette en attente.</p>}
-      <ul className="admin-list">
+      <ul className="validations-list">
         {recipes.map((recipe) => (
           <li key={recipe.id}>
             <div>
               <Link to={`/recettes/${recipe.id}`}>{recipe.title}</Link>
               <span className="muted"> — proposée par {recipe.author_username}</span>
             </div>
-            <div className="admin-actions">
+            <div className="validations-actions">
               <button onClick={() => handleApprove(recipe.id)}>Valider</button>
               <button onClick={() => handleReject(recipe.id)} className="danger">
                 Rejeter

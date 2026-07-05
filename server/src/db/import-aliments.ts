@@ -90,6 +90,9 @@ ON CONFLICT (code) DO UPDATE SET nom = EXCLUDED.nom;
 
 // Un seul aliment (code groupe 0, "Dessert (aliment moyen)") tombe dans le cas
 // par defaut ci-dessous ; tous les autres groupes sont mappes explicitement.
+// Le WHERE final protege les aliments crees depuis l'interface admin (sans
+// t_groupe_code CIQUAL) : leur categorie, choisie manuellement, n'est jamais
+// recalculee par un ré-import.
 const CATEGORIZE_ALIMENTS_SQL = `
 UPDATE aliments SET categorie_code = CASE
   WHEN t_groupe_code = 1 THEN 10
@@ -105,7 +108,8 @@ UPDATE aliments SET categorie_code = CASE
   WHEN t_groupe_code = 10 THEN 9
   WHEN t_groupe_code = 11 THEN 11
   ELSE 7
-END;
+END
+WHERE t_groupe_code IS NOT NULL;
 
 ALTER TABLE aliments DROP CONSTRAINT IF EXISTS fk_aliments_categorie;
 ALTER TABLE aliments ALTER COLUMN categorie_code SET NOT NULL;

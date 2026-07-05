@@ -105,6 +105,10 @@ CREATE TABLE IF NOT EXISTS categories_simples (
 ALTER TABLE aliments ADD COLUMN IF NOT EXISTS categorie_code INTEGER;
 ALTER TABLE aliments ALTER COLUMN categorie_code SET DEFAULT 7;
 
+-- Codes attribues aux aliments crees depuis l'interface admin (voir routes/aliments.ts),
+-- dans une plage qui ne recoupe jamais les codes CIQUAL importes (tous < 100000).
+CREATE SEQUENCE IF NOT EXISTS aliments_custom_code_seq START WITH 900000;
+
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
   id SERIAL PRIMARY KEY,
   recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
@@ -114,6 +118,20 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
+
+-- Filet de securite : la contrainte inline ci-dessus ne s'applique qu'a la creation
+-- initiale de la table. Si "aliments" a deja ete recreee via un DROP ... CASCADE
+-- (ce qui arrive au moins une fois dans l'historique de ce projet), la contrainte
+-- est perdue et CREATE TABLE IF NOT EXISTS ne la restaure pas. On nettoie d'abord
+-- les lignes orphelines (sinon ADD CONSTRAINT echoue sur les donnees existantes),
+-- puis on reassert la contrainte.
+DELETE FROM recipe_ingredients ri
+WHERE NOT EXISTS (SELECT 1 FROM aliments a WHERE a.t_aliment_code = ri.aliment_code);
+
+ALTER TABLE recipe_ingredients DROP CONSTRAINT IF EXISTS recipe_ingredients_aliment_code_fkey;
+ALTER TABLE recipe_ingredients
+  ADD CONSTRAINT recipe_ingredients_aliment_code_fkey
+  FOREIGN KEY (aliment_code) REFERENCES aliments(t_aliment_code);
 `;
 
 async function migrate() {

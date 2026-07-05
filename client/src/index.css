@@ -1007,10 +1007,19 @@ textarea {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.sortable-th:hover {
+/* Spécificité alignée sur "button:hover:not(:disabled)" (règle globale des
+   boutons) pour que le fond clair l'emporte au lieu du fond plein orange des
+   boutons standards, qui rendait le titre illisible (même couleur que le texte). */
+button.sortable-th:hover {
+  background: var(--accent-bg);
   color: var(--accent-dark);
+}
+
+.sortable-th:hover .sort-indicator {
+  opacity: 1;
 }
 
 .sort-indicator {

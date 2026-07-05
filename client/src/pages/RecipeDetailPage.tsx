@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { fetchRecipe } from "../api/recipes";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { deleteRecipe, fetchRecipe, getRecipePhotoUrl } from "../api/recipes";
 import type { Recipe } from "../api/recipes";
 import { ApiError } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 
 const STATUS_LABELS: Record<Recipe["status"], string> = {
   pending: "En attente de validation",
@@ -12,6 +13,8 @@ const STATUS_LABELS: Record<Recipe["status"], string> = {
 
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,9 +31,39 @@ export function RecipeDetailPage() {
   if (error) return <p className="error">{error}</p>;
   if (!recipe) return null;
 
+  const isAdmin = user?.role === "admin";
+  const isOwner = user?.id === recipe.author_id;
+  const canManage = isAdmin || (isOwner && recipe.status === "pending");
+
+  async function handleDelete() {
+    if (!recipe) return;
+    if (!window.confirm(`Supprimer « ${recipe.title} » ?`)) return;
+    await deleteRecipe(recipe.id);
+    navigate(isAdmin ? "/admin" : "/mes-recettes");
+  }
+
   return (
     <article className="recipe-detail">
-      <h1>{recipe.title}</h1>
+      <div className="page-header">
+        <h1>{recipe.title}</h1>
+        {canManage && (
+          <div className="validations-actions">
+            <Link to={`/recettes/${recipe.id}/modifier`} className="button-link">
+              Modifier
+            </Link>
+            <button type="button" className="danger" onClick={handleDelete}>
+              Supprimer
+            </button>
+          </div>
+        )}
+      </div>
+      {recipe.hasPhoto && (
+        <img
+          src={getRecipePhotoUrl(recipe.id)}
+          alt={recipe.title}
+          className="recipe-photo"
+        />
+      )}
       {recipe.status !== "approved" && (
         <p className={`status-badge status-${recipe.status}`}>{STATUS_LABELS[recipe.status]}</p>
       )}
@@ -41,7 +74,7 @@ export function RecipeDetailPage() {
       <ul className="ingredient-list-readonly">
         {recipe.ingredients.map((ingredient) => (
           <li key={ingredient.alimentCode}>
-            {ingredient.nom} — {ingredient.quantityG} g
+            {ingredient.nom} — {ingredient.quantity} {ingredient.unit}
           </li>
         ))}
       </ul>

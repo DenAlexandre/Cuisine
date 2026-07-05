@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { createRecipe, deleteRecipe, fetchMyRecipes } from "../api/recipes";
+import { deleteRecipe, fetchFavoriteRecipes, fetchMyRecipes, removeFavorite } from "../api/recipes";
 import type { Recipe } from "../api/recipes";
-import { ApiError } from "../api/client";
-import { IngredientPicker } from "../components/IngredientPicker";
 
 const STATUS_LABELS: Record<Recipe["status"], string> = {
   pending: "En attente",
@@ -12,57 +9,28 @@ const STATUS_LABELS: Record<Recipe["status"], string> = {
   rejected: "Rejetée",
 };
 
-const EMPTY_FORM = {
-  title: "",
-  description: "",
-  steps: "",
-  servings: 4,
-  ingredients: [] as { alimentCode: number; quantityG: number; nom: string }[],
-};
-
 export function MyRecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [favorites, setFavorites] = useState<Recipe[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
 
   function loadRecipes() {
     return fetchMyRecipes().then(({ recipes }) => setRecipes(recipes));
   }
 
+  function loadFavorites() {
+    return fetchFavoriteRecipes().then(({ recipes }) => setFavorites(recipes));
+  }
+
   useEffect(() => {
     loadRecipes().finally(() => setLoading(false));
+    loadFavorites().finally(() => setFavoritesLoading(false));
   }, []);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (form.ingredients.length === 0) {
-      setError("Ajoutez au moins un ingrédient.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await createRecipe({
-        title: form.title,
-        description: form.description,
-        steps: form.steps,
-        servings: form.servings,
-        ingredients: form.ingredients.map(({ alimentCode, quantityG }) => ({
-          alimentCode,
-          quantityG,
-        })),
-      });
-      setForm(EMPTY_FORM);
-      await loadRecipes();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur lors de la création.");
-    } finally {
-      setSubmitting(false);
-    }
+  async function handleRemoveFavorite(id: number) {
+    await removeFavorite(id);
+    await loadFavorites();
   }
 
   async function handleDelete(id: number) {
@@ -72,58 +40,30 @@ export function MyRecipesPage() {
 
   return (
     <div>
-      <h1>Mes recettes</h1>
+      <div className="page-header">
+        <h1>Mes recettes</h1>
+        <Link to="/nouvelle-recette" className="button-link">
+          Ajouter une recette
+        </Link>
+      </div>
 
-      <section className="create-recipe">
-        <h2>Proposer une nouvelle recette</h2>
-        <form onSubmit={handleSubmit}>
-          <label>
-            Titre
-            <input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Nombre de personnes
-            <input
-              type="number"
-              min={1}
-              step="1"
-              value={form.servings}
-              onChange={(e) => setForm({ ...form, servings: Number(e.target.value) })}
-              required
-            />
-          </label>
-          <label>
-            Ingrédients
-            <IngredientPicker
-              value={form.ingredients}
-              onChange={(ingredients) => setForm({ ...form, ingredients })}
-            />
-          </label>
-          <label>
-            Étapes
-            <textarea
-              value={form.steps}
-              onChange={(e) => setForm({ ...form, steps: e.target.value })}
-              required
-            />
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={submitting}>
-            Soumettre pour validation
-          </button>
-        </form>
+      <section>
+        <h2>Mes favoris</h2>
+        {favoritesLoading && <p>Chargement...</p>}
+        {!favoritesLoading && favorites.length === 0 && (
+          <p>Vous n'avez pas encore de recette en favori.</p>
+        )}
+        <ul className="my-recipes-list">
+          {favorites.map((recipe) => (
+            <li key={recipe.id}>
+              <Link to={`/recettes/${recipe.id}`}>{recipe.title}</Link>
+              <span className="muted">par {recipe.author_username}</span>
+              <button className="danger" onClick={() => handleRemoveFavorite(recipe.id)}>
+                Retirer des favoris
+              </button>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section>

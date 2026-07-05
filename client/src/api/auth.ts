@@ -22,21 +22,17 @@ export interface RegisterInput {
 }
 
 export function register(input: RegisterInput) {
-  return apiFetch<{ user: User }>("/auth/register", {
+  return apiFetch<{ user: User; token: string }>("/auth/register", {
     method: "POST",
     body: JSON.stringify(input),
   });
 }
 
 export function login(username: string, password: string) {
-  return apiFetch<{ user: User }>("/auth/login", {
+  return apiFetch<{ user: User; token: string }>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
-}
-
-export function logout() {
-  return apiFetch<void>("/auth/logout", { method: "POST" });
 }
 
 export function fetchMe() {

@@ -1,4 +1,21 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+
+// Stocké en sessionStorage (propre à chaque onglet/fenêtre) plutôt qu'en cookie,
+// pour permettre plusieurs sessions différentes ouvertes en parallèle sur le
+// même navigateur (ex: admin dans une fenêtre, user dans une autre).
+const TOKEN_KEY = "cuisine.token";
+
+export function getToken(): string | null {
+  return sessionStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null) {
+  if (token) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } else {
+    sessionStorage.removeItem(TOKEN_KEY);
+  }
+}
 
 export class ApiError extends Error {
   status: number;
@@ -9,10 +26,12 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+
   const res = await fetch(`${API_URL}${path}`, {
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,

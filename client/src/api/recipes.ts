@@ -1,11 +1,15 @@
-import { apiFetch } from "./client";
+import { API_URL, apiFetch } from "./client";
 
 export type RecipeStatus = "pending" | "approved" | "rejected";
+export type RecipeCategory = "cocktail" | "entree" | "plat" | "dessert";
+
+export type RecipeIngredientUnit = "g" | "cl";
 
 export interface RecipeIngredient {
   alimentCode: number;
   nom: string;
-  quantityG: number;
+  quantity: number;
+  unit: RecipeIngredientUnit;
   proteines: number | null;
   glucides: number | null;
   lipides: number | null;
@@ -25,6 +29,7 @@ export interface Recipe {
   description: string;
   steps: string;
   servings: number;
+  category: RecipeCategory;
   status: RecipeStatus;
   created_at: string;
   reviewed_at: string | null;
@@ -32,11 +37,13 @@ export interface Recipe {
   author_username?: string;
   ingredients: RecipeIngredient[];
   nutrition: RecipeNutrition;
+  isFavorite: boolean;
+  hasPhoto: boolean;
 }
 
 export interface RecipeIngredientInput {
   alimentCode: number;
-  quantityG: number;
+  quantity: number;
 }
 
 export interface RecipeInput {
@@ -44,11 +51,19 @@ export interface RecipeInput {
   description: string;
   steps: string;
   servings: number;
+  category: RecipeCategory;
+  // undefined = ne pas toucher la photo existante, null = la retirer, string = nouvelle photo.
+  photoBase64?: string | null;
   ingredients: RecipeIngredientInput[];
 }
 
-export function fetchApprovedRecipes() {
-  return apiFetch<{ recipes: Recipe[] }>("/recipes");
+export function getRecipePhotoUrl(id: number) {
+  return `${API_URL}/recipes/${id}/photo`;
+}
+
+export function fetchApprovedRecipes(category?: RecipeCategory) {
+  const query = category ? `?categorie=${category}` : "";
+  return apiFetch<{ recipes: Recipe[] }>(`/recipes${query}`);
 }
 
 export function fetchRecipe(id: number | string) {
@@ -59,9 +74,28 @@ export function fetchMyRecipes() {
   return apiFetch<{ recipes: Recipe[] }>("/recipes/mine");
 }
 
+export function fetchFavoriteRecipes() {
+  return apiFetch<{ recipes: Recipe[] }>("/recipes/favorites");
+}
+
+export function addFavorite(id: number) {
+  return apiFetch<void>(`/recipes/${id}/favorite`, { method: "POST" });
+}
+
+export function removeFavorite(id: number) {
+  return apiFetch<void>(`/recipes/${id}/favorite`, { method: "DELETE" });
+}
+
 export function createRecipe(input: RecipeInput) {
   return apiFetch<{ recipe: Recipe }>("/recipes", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateRecipe(id: number, input: RecipeInput) {
+  return apiFetch<{ recipe: Recipe }>(`/recipes/${id}`, {
+    method: "PUT",
     body: JSON.stringify(input),
   });
 }

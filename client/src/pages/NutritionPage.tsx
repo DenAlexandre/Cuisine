@@ -117,18 +117,27 @@ export function NutritionPage() {
                 <th>Glucides (g)</th>
                 <th>Lipides (g)</th>
                 <th>Énergie (kcal)</th>
+                <th>Alcool (%)</th>
                 {isAdmin && <th></th>}
               </tr>
             </thead>
             <tbody>
               {results.map((aliment) => (
                 <tr key={aliment.code}>
-                  <td>{aliment.nom}</td>
+                  <td>
+                    {aliment.nom}
+                    {aliment.infoComplementaire && (
+                      <span className="info-tooltip" title={aliment.infoComplementaire}>
+                        ⓘ
+                      </span>
+                    )}
+                  </td>
                   <td className="muted">{aliment.categorie}</td>
                   <td>{formatValue(aliment.proteines)}</td>
                   <td>{formatValue(aliment.glucides)}</td>
                   <td>{formatValue(aliment.lipides)}</td>
                   <td>{formatValue(aliment.energie)}</td>
+                  <td>{formatValue(aliment.degreAlcool)}</td>
                   {isAdmin && (
                     <td className="aliment-row-actions">
                       <button

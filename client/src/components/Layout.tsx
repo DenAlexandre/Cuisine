@@ -7,8 +7,8 @@ export function Layout() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  async function handleLogout() {
-    await logout();
+  function handleLogout() {
+    logout();
     navigate("/");
   }
 
@@ -27,9 +27,16 @@ export function Layout() {
           <NavLink to="/" onClick={closeMenu} end>
             Recettes
           </NavLink>
-          <NavLink to="/nutrition" onClick={closeMenu}>
-            Nutrition
-          </NavLink>
+          {user && (
+            <NavLink to="/imc" onClick={closeMenu}>
+              IMC
+            </NavLink>
+          )}
+          {user?.role === "admin" && (
+            <NavLink to="/nutrition" onClick={closeMenu}>
+              Nutrition
+            </NavLink>
+          )}
           {user && (
             <NavLink to="/mes-recettes" onClick={closeMenu}>
               Mes recettes

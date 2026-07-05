@@ -27,6 +27,8 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
   const [glucides, setGlucides] = useState(toInputValue(initial?.glucides));
   const [lipides, setLipides] = useState(toInputValue(initial?.lipides));
   const [energie, setEnergie] = useState(toInputValue(initial?.energie));
+  const [degreAlcool, setDegreAlcool] = useState(toInputValue(initial?.degreAlcool));
+  const [infoComplementaire, setInfoComplementaire] = useState(initial?.infoComplementaire ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,6 +37,8 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
       .then(({ categories }) => setCategories(categories))
       .catch(() => setCategories([]));
   }, []);
+
+  const isBoisson = categories.find((c) => String(c.code) === categorieCode)?.nom === "Boissons";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -52,6 +56,8 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
         glucides: toNullableNumber(glucides),
         lipides: toNullableNumber(lipides),
         energie: toNullableNumber(energie),
+        degreAlcool: isBoisson ? toNullableNumber(degreAlcool) : null,
+        infoComplementaire: infoComplementaire.trim() === "" ? null : infoComplementaire,
       });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erreur lors de l'enregistrement.");
@@ -123,7 +129,29 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
             onChange={(e) => setEnergie(e.target.value)}
           />
         </label>
+        {isBoisson && (
+          <label>
+            Degré d'alcool (%)
+            <input
+              type="number"
+              step="any"
+              min={0}
+              max={100}
+              value={degreAlcool}
+              onChange={(e) => setDegreAlcool(e.target.value)}
+            />
+          </label>
+        )}
       </div>
+
+      <label>
+        Info complémentaire
+        <textarea
+          value={infoComplementaire}
+          onChange={(e) => setInfoComplementaire(e.target.value)}
+          placeholder="Allergènes, conseil de conservation, etc."
+        />
+      </label>
 
       {error && <p className="error">{error}</p>}
 

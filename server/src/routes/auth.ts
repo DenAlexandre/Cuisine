@@ -27,13 +27,6 @@ const loginSchema = z.object({
 
 const USER_FIELDS = "id, username, first_name AS \"firstName\", last_name AS \"lastName\", email, phone, role";
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
-
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -59,8 +52,7 @@ router.post("/register", async (req, res) => {
   const user = result.rows[0];
 
   const token = signToken({ id: user.id, role: user.role });
-  res.cookie("token", token, COOKIE_OPTIONS);
-  res.status(201).json({ user });
+  res.status(201).json({ user, token });
 });
 
 router.post("/login", async (req, res) => {
@@ -80,14 +72,8 @@ router.post("/login", async (req, res) => {
   }
 
   const token = signToken({ id: user.id, role: user.role });
-  res.cookie("token", token, COOKIE_OPTIONS);
   delete user.password_hash;
-  res.json({ user });
-});
-
-router.post("/logout", (_req, res) => {
-  res.clearCookie("token", COOKIE_OPTIONS);
-  res.status(204).send();
+  res.json({ user, token });
 });
 
 router.get("/me", requireAuth, async (req, res) => {

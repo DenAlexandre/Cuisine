@@ -13,7 +13,9 @@ const ALIMENT_FIELDS = `
   a.t_proteines::float8 AS proteines,
   a.t_glucides::float8 AS glucides,
   a.t_lipides::float8 AS lipides,
-  a.t_energie::float8 AS energie
+  a.t_energie::float8 AS energie,
+  a.degre_alcool::float8 AS "degreAlcool",
+  a.info_complementaire AS "infoComplementaire"
 `;
 
 const ALIMENT_JOINS = `
@@ -28,6 +30,8 @@ const alimentSchema = z.object({
   glucides: z.number().nonnegative().nullable(),
   lipides: z.number().nonnegative().nullable(),
   energie: z.number().nonnegative().nullable(),
+  degreAlcool: z.number().min(0).max(100).nullable(),
+  infoComplementaire: z.string().max(2000).nullable(),
 });
 
 function parseIntParam(value: unknown): number | null {
@@ -87,13 +91,14 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
-  const { nom, categorieCode, proteines, glucides, lipides, energie } = parsed.data;
+  const { nom, categorieCode, proteines, glucides, lipides, energie, degreAlcool, infoComplementaire } =
+    parsed.data;
 
   const result = await pool.query(
-    `INSERT INTO aliments (t_aliment_code, t_aliment_nom, categorie_code, t_proteines, t_glucides, t_lipides, t_energie)
-     VALUES (nextval('aliments_custom_code_seq'), $1, $2, $3, $4, $5, $6)
+    `INSERT INTO aliments (t_aliment_code, t_aliment_nom, categorie_code, t_proteines, t_glucides, t_lipides, t_energie, degre_alcool, info_complementaire)
+     VALUES (nextval('aliments_custom_code_seq'), $1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING t_aliment_code`,
-    [nom, categorieCode, proteines, glucides, lipides, energie]
+    [nom, categorieCode, proteines, glucides, lipides, energie, degreAlcool, infoComplementaire]
   );
 
   const aliment = await fetchAlimentByCode(result.rows[0].t_aliment_code);
@@ -106,13 +111,14 @@ router.put("/:code", requireAuth, requireRole("admin"), async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
-  const { nom, categorieCode, proteines, glucides, lipides, energie } = parsed.data;
+  const { nom, categorieCode, proteines, glucides, lipides, energie, degreAlcool, infoComplementaire } =
+    parsed.data;
 
   const result = await pool.query(
     `UPDATE aliments
-     SET t_aliment_nom = $1, categorie_code = $2, t_proteines = $3, t_glucides = $4, t_lipides = $5, t_energie = $6
-     WHERE t_aliment_code = $7`,
-    [nom, categorieCode, proteines, glucides, lipides, energie, req.params.code]
+     SET t_aliment_nom = $1, categorie_code = $2, t_proteines = $3, t_glucides = $4, t_lipides = $5, t_energie = $6, degre_alcool = $7, info_complementaire = $8
+     WHERE t_aliment_code = $9`,
+    [nom, categorieCode, proteines, glucides, lipides, energie, degreAlcool, infoComplementaire, req.params.code]
   );
   if (!result.rowCount) {
     return res.status(404).json({ error: "Aliment introuvable." });

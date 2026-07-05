@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { searchAliments } from "../api/aliments";
 import type { Aliment } from "../api/aliments";
-import type { RecipeIngredientInput } from "../api/recipes";
+import type { RecipeIngredientInput, RecipeIngredientUnit } from "../api/recipes";
 import { CategoryFilter } from "./CategoryFilter";
 
 interface PickedIngredient extends RecipeIngredientInput {
   nom: string;
+  unit: RecipeIngredientUnit;
 }
 
 interface IngredientPickerProps {
   value: PickedIngredient[];
   onChange: (ingredients: PickedIngredient[]) => void;
+}
+
+function unitFor(aliment: Aliment): RecipeIngredientUnit {
+  return aliment.categorie === "Boissons" ? "cl" : "g";
 }
 
 export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
@@ -38,14 +43,16 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
 
   function addIngredient(aliment: Aliment) {
     if (value.some((i) => i.alimentCode === aliment.code)) return;
-    onChange([...value, { alimentCode: aliment.code, nom: aliment.nom, quantityG: 100 }]);
-    // Reset complet (texte + catégorie) : sinon, si une catégorie était sélectionnée,
-    // la recherche se relance automatiquement et rouvre la liste de suggestions.
-    resetSearch();
+    onChange([
+      ...value,
+      { alimentCode: aliment.code, nom: aliment.nom, quantity: 100, unit: unitFor(aliment) },
+    ]);
+    setQuery("");
+    setSuggestions([]);
   }
 
-  function updateQuantity(alimentCode: number, quantityG: number) {
-    onChange(value.map((i) => (i.alimentCode === alimentCode ? { ...i, quantityG } : i)));
+  function updateQuantity(alimentCode: number, quantity: number) {
+    onChange(value.map((i) => (i.alimentCode === alimentCode ? { ...i, quantity } : i)));
   }
 
   function removeIngredient(alimentCode: number) {
@@ -99,10 +106,10 @@ export function IngredientPicker({ value, onChange }: IngredientPickerProps) {
                 type="number"
                 min={1}
                 step="1"
-                value={item.quantityG}
+                value={item.quantity}
                 onChange={(e) => updateQuantity(item.alimentCode, Number(e.target.value))}
               />
-              <span className="muted">g</span>
+              <span className="muted">{item.unit}</span>
               <button type="button" className="danger" onClick={() => removeIngredient(item.alimentCode)}>
                 Retirer
               </button>

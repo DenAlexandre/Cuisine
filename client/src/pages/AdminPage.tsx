@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { approveRecipe, fetchPendingRecipes, rejectRecipe } from "../api/recipes";
+import { approveRecipe, deleteRecipe, fetchPendingRecipes, rejectRecipe } from "../api/recipes";
 import type { Recipe } from "../api/recipes";
 
 export function AdminPage() {
@@ -25,6 +25,12 @@ export function AdminPage() {
     await loadRecipes();
   }
 
+  async function handleDelete(recipe: Recipe) {
+    if (!window.confirm(`Supprimer « ${recipe.title} » ?`)) return;
+    await deleteRecipe(recipe.id);
+    await loadRecipes();
+  }
+
   if (loading) return <p>Chargement...</p>;
 
   return (
@@ -42,6 +48,12 @@ export function AdminPage() {
               <button onClick={() => handleApprove(recipe.id)}>Valider</button>
               <button onClick={() => handleReject(recipe.id)} className="danger">
                 Rejeter
+              </button>
+              <Link to={`/recettes/${recipe.id}/modifier`} className="button-link">
+                Modifier
+              </Link>
+              <button onClick={() => handleDelete(recipe)} className="danger">
+                Supprimer
               </button>
             </div>
           </li>

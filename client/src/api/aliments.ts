@@ -9,6 +9,8 @@ export interface Aliment {
   glucides: number | null;
   lipides: number | null;
   energie: number | null;
+  degreAlcool: number | null;
+  infoComplementaire: string | null;
 }
 
 export interface AlimentSearchFilters {
@@ -23,6 +25,8 @@ export interface AlimentInput {
   glucides: number | null;
   lipides: number | null;
   energie: number | null;
+  degreAlcool: number | null;
+  infoComplementaire: string | null;
 }
 
 export function searchAliments(filters: AlimentSearchFilters) {

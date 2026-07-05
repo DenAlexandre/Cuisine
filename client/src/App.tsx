@@ -7,8 +7,11 @@ import { RecipeDetailPage } from "./pages/RecipeDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { MyRecipesPage } from "./pages/MyRecipesPage";
+import { NewRecipePage } from "./pages/NewRecipePage";
+import { EditRecipePage } from "./pages/EditRecipePage";
 import { AdminPage } from "./pages/AdminPage";
 import { NutritionPage } from "./pages/NutritionPage";
+import { ImcPage } from "./pages/ImcPage";
 
 function App() {
   return (
@@ -17,7 +20,30 @@ function App() {
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="recettes/:id" element={<RecipeDetailPage />} />
-          <Route path="nutrition" element={<NutritionPage />} />
+          <Route
+            path="recettes/:id/modifier"
+            element={
+              <ProtectedRoute>
+                <EditRecipePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nutrition"
+            element={
+              <AdminRoute>
+                <NutritionPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="imc"
+            element={
+              <ProtectedRoute>
+                <ImcPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />
           <Route
@@ -25,6 +51,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <MyRecipesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="nouvelle-recette"
+            element={
+              <ProtectedRoute>
+                <NewRecipePage />
               </ProtectedRoute>
             }
           />

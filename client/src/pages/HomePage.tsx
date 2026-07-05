@@ -161,7 +161,7 @@ export function HomePage() {
             )}
             <h2>{recipe.title}</h2>
             <p>{recipe.description}</p>
-            <span className="muted">par {recipe.author_username}</span>
+            <span className="muted">{Math.round(recipe.nutrition.energie)} kcal / personne</span>
           </Link>
         ))}
       </div>

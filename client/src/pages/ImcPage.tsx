@@ -83,6 +83,7 @@ export function ImcPage() {
   const [submittingWeight, setSubmittingWeight] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     fetchWeightHistory()
       .then(({ entries }) => {
         setHistory(entries);
@@ -101,13 +102,20 @@ export function ImcPage() {
         }
         if (lastHeight != null && lastWeight != null) {
           const bmi = calculateBmi(lastWeight, lastHeight);
-          // L'apport calorique nécessite l'âge (pas encore chargé de façon fiable
-          // à ce stade) : recalculé au clic sur "Calculer mon IMC" uniquement.
-          setResult({ bmi, category: classifyBmi(bmi), maintenanceKcal: null });
+          // Lu directement depuis le stockage local (plutôt que l'état React
+          // age/sex/activityLevel, pas garanti à jour à ce stade) pour que
+          // l'apport calorique s'affiche dès le chargement, pas seulement
+          // après un clic sur "Calculer mon IMC".
+          const profile = loadImcProfile(user.id);
+          const ageNum = Number(profile.age);
+          const maintenanceKcal = ageNum
+            ? calculateMaintenanceCalories(lastWeight, lastHeight, ageNum, profile.sex, profile.activityLevel)
+            : null;
+          setResult({ bmi, category: classifyBmi(bmi), maintenanceKcal });
         }
       })
       .finally(() => setHistoryLoading(false));
-  }, []);
+  }, [user]);
 
   // null si l'âge n'est pas renseigné : l'apport calorique reste optionnel,
   // seul l'IMC (poids + taille) est requis.
@@ -312,7 +320,7 @@ export function ImcPage() {
                 {result.maintenanceKcal != null ? (
                   <p>
                     <strong>{Math.round(result.maintenanceKcal)} kcal/jour</strong>
-                    <span className="muted"> pour ne pas grossir, à profil constant.</span>
+                    <span className="muted"> est la limite maximale en fonction de votre profil.</span>
                   </p>
                 ) : (
                   <p className="muted">

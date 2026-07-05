@@ -11,6 +11,10 @@ export interface Aliment {
   energie: number | null;
   degreAlcool: number | null;
   infoComplementaire: string | null;
+  // Permet de saisir cet aliment "à la pièce" (ex: 2 œufs) : poids d'une unité
+  // en grammes + libellé affiché (ex: "œuf(s)"). Toujours renseignés ensemble.
+  poidsUnitaireG: number | null;
+  libelleUnite: string | null;
 }
 
 export interface AlimentSearchFilters {
@@ -27,6 +31,8 @@ export interface AlimentInput {
   energie: number | null;
   degreAlcool: number | null;
   infoComplementaire: string | null;
+  poidsUnitaireG: number | null;
+  libelleUnite: string | null;
 }
 
 export function searchAliments(filters: AlimentSearchFilters) {

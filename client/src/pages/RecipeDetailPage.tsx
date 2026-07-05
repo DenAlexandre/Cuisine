@@ -59,7 +59,11 @@ export function RecipeDetailPage() {
         )}
       </div>
       {recipe.hasPhoto ? (
-        <img src={getRecipePhotoUrl(recipe.id)} alt={recipe.title} className="recipe-photo" />
+        <img
+          src={getRecipePhotoUrl(recipe.id, recipe.photoVersion)}
+          alt={recipe.title}
+          className="recipe-photo"
+        />
       ) : (
         <CategoryThumbnail category={recipe.category} className="recipe-photo" />
       )}
@@ -73,7 +77,17 @@ export function RecipeDetailPage() {
       <ul className="ingredient-list-readonly">
         {recipe.ingredients.map((ingredient) => (
           <li key={ingredient.alimentCode}>
-            {ingredient.nom} — {ingredient.quantity} {ingredient.unit}
+            {ingredient.nom} — {ingredient.quantity}{" "}
+            {ingredient.unit === "unite" ? ingredient.libelleUnite : ingredient.unit}
+            {ingredient.gramsEquivalent != null && (
+              <span className="muted"> ({Math.round(ingredient.gramsEquivalent)} g)</span>
+            )}
+            {ingredient.kcal != null && (
+              <span className="muted"> · {Math.round(ingredient.kcal)} kcal</span>
+            )}
+            {ingredient.degreAlcool != null && (
+              <span className="muted"> · {ingredient.degreAlcool}° d'alcool</span>
+            )}
           </li>
         ))}
       </ul>
@@ -81,7 +95,7 @@ export function RecipeDetailPage() {
       <h2>Étapes</h2>
       <p className="preformatted">{recipe.steps}</p>
 
-      <h2>Valeurs nutritionnelles</h2>
+      <h2>Valeurs nutritionnelles (par personne)</h2>
       <div className="table-scroll">
         <table className="nutrition-table">
           <thead>
@@ -102,6 +116,21 @@ export function RecipeDetailPage() {
           </tbody>
         </table>
       </div>
+
+      {recipe.alcohol && (
+        <>
+          <h2>Alcoolémie estimée</h2>
+          <p className="muted">
+            Environ {recipe.alcohol.gramsPerServing.toFixed(1)} g d'alcool pur par personne, soit
+            une alcoolémie indicative de <strong>{recipe.alcohol.bloodAlcoholGL.toFixed(2)} g/L</strong>{" "}
+            (poids de référence : {recipe.alcohol.referenceWeightKg} kg).
+          </p>
+          <p className="muted">
+            Estimation indicative (formule de Widmark), qui ne tient pas compte de votre poids ou
+            sexe réels : elle ne remplace pas un éthylotest.
+          </p>
+        </>
+      )}
     </article>
   );
 }

@@ -4,12 +4,27 @@ import type { Aliment } from "../api/aliments";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { AlimentForm } from "../components/AlimentForm";
 import { useAuth } from "../context/AuthContext";
+import { useSortableTable } from "../hooks/useSortableTable";
+import { SortableTh } from "../components/SortableTh";
 
 function formatValue(value: number | null): string {
   return value === null ? "—" : value.toString();
 }
 
 type FormState = { mode: "closed" } | { mode: "create" } | { mode: "edit"; aliment: Aliment };
+
+type AlimentSortKey = "nom" | "categorie" | "proteines" | "glucides" | "lipides" | "energie" | "degreAlcool";
+
+function alimentSortValue(aliment: Aliment, key: AlimentSortKey) {
+  switch (key) {
+    case "nom":
+      return aliment.nom;
+    case "categorie":
+      return aliment.categorie;
+    default:
+      return aliment[key];
+  }
+}
 
 export function NutritionPage() {
   const { user } = useAuth();
@@ -22,6 +37,10 @@ export function NutritionPage() {
   const [form, setForm] = useState<FormState>({ mode: "closed" });
   const [actionError, setActionError] = useState<string | null>(null);
   const timeoutRef = useRef<number | undefined>(undefined);
+  const { sorted: sortedResults, sortKey, direction, toggleSort } = useSortableTable<
+    Aliment,
+    AlimentSortKey
+  >(results, alimentSortValue);
 
   const hasQuery = query.trim().length >= 2;
   const hasCategory = categorieCode !== null;
@@ -111,18 +130,18 @@ export function NutritionPage() {
           <table className="nutrition-table">
             <thead>
               <tr>
-                <th>Aliment</th>
-                <th>Catégorie</th>
-                <th>Protéines (g)</th>
-                <th>Glucides (g)</th>
-                <th>Lipides (g)</th>
-                <th>Énergie (kcal)</th>
-                <th>Alcool (%)</th>
+                <SortableTh label="Aliment" sortKey="nom" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                <SortableTh label="Catégorie" sortKey="categorie" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                <SortableTh label="Protéines (g)" sortKey="proteines" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                <SortableTh label="Glucides (g)" sortKey="glucides" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                <SortableTh label="Lipides (g)" sortKey="lipides" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                <SortableTh label="Énergie (kcal)" sortKey="energie" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                <SortableTh label="Alcool (%)" sortKey="degreAlcool" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                 {isAdmin && <th></th>}
               </tr>
             </thead>
             <tbody>
-              {results.map((aliment) => (
+              {sortedResults.map((aliment) => (
                 <tr key={aliment.code}>
                   <td>
                     {aliment.nom}

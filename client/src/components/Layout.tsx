@@ -49,6 +49,11 @@ export function Layout() {
             Recettes
           </NavLink>
           {user && (
+            <NavLink to="/mes-recettes" onClick={closeMenu}>
+              Mes recettes
+            </NavLink>
+          )}
+          {user && (
             <NavLink to="/imc" onClick={closeMenu}>
               IMC
             </NavLink>
@@ -56,11 +61,6 @@ export function Layout() {
           {user?.role === "admin" && (
             <NavLink to="/nutrition" onClick={closeMenu}>
               Nutrition
-            </NavLink>
-          )}
-          {user && (
-            <NavLink to="/mes-recettes" onClick={closeMenu}>
-              Mes recettes
             </NavLink>
           )}
           {user?.role === "admin" && (
@@ -76,6 +76,11 @@ export function Layout() {
           {user?.role === "admin" && (
             <NavLink to="/admin/utilisateurs" onClick={closeMenu}>
               Utilisateurs
+            </NavLink>
+          )}
+          {user?.role === "admin" && (
+            <NavLink to="/admin/systeme" onClick={closeMenu}>
+              Options système
             </NavLink>
           )}
         </nav>

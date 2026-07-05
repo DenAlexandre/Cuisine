@@ -1,10 +1,16 @@
 const TARGET_WIDTH = 800;
 const TARGET_HEIGHT = 600;
 const JPEG_QUALITY = 0.8;
+// Gris chaud plutôt que blanc pur : le blanc se confondait avec le fond des
+// cartes/pages, rendant les bandes de recadrage invisibles (l'image semblait
+// coupée alors qu'elle était entière, juste avec un fond de la même couleur).
+const LETTERBOX_COLOR = "#ede4d9";
 
-// Recadre l'image au centre pour remplir exactement TARGET_WIDTH x TARGET_HEIGHT
-// (comme un CSS object-fit: cover), puis compresse en JPEG pour limiter la taille
-// stockée en base.
+// Redimensionne l'image, proportions conservées, pour qu'elle tienne entière
+// dans le cadre TARGET_WIDTH x TARGET_HEIGHT (comme un CSS object-fit: contain,
+// contrairement à l'ancien recadrage en "cover" qui coupait les bords), avec un
+// fond neutre dans les bandes restantes, puis compresse en JPEG pour limiter la
+// taille stockée en base.
 export function cropImageToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -23,23 +29,16 @@ export function cropImageToDataUrl(file: File): Promise<string> {
           return;
         }
 
-        const targetRatio = TARGET_WIDTH / TARGET_HEIGHT;
-        const sourceRatio = img.width / img.height;
+        ctx.fillStyle = LETTERBOX_COLOR;
+        ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
 
-        let sx = 0;
-        let sy = 0;
-        let sWidth = img.width;
-        let sHeight = img.height;
+        const scale = Math.min(TARGET_WIDTH / img.width, TARGET_HEIGHT / img.height);
+        const drawWidth = img.width * scale;
+        const drawHeight = img.height * scale;
+        const dx = (TARGET_WIDTH - drawWidth) / 2;
+        const dy = (TARGET_HEIGHT - drawHeight) / 2;
 
-        if (sourceRatio > targetRatio) {
-          sWidth = img.height * targetRatio;
-          sx = (img.width - sWidth) / 2;
-        } else {
-          sHeight = img.width / targetRatio;
-          sy = (img.height - sHeight) / 2;
-        }
-
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+        ctx.drawImage(img, 0, 0, img.width, img.height, dx, dy, drawWidth, drawHeight);
         resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
       };
       img.src = reader.result as string;

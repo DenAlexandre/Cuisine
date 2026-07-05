@@ -29,6 +29,9 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
   const [energie, setEnergie] = useState(toInputValue(initial?.energie));
   const [degreAlcool, setDegreAlcool] = useState(toInputValue(initial?.degreAlcool));
   const [infoComplementaire, setInfoComplementaire] = useState(initial?.infoComplementaire ?? "");
+  const [saisieALaPiece, setSaisieALaPiece] = useState(initial?.poidsUnitaireG != null);
+  const [poidsUnitaireG, setPoidsUnitaireG] = useState(toInputValue(initial?.poidsUnitaireG));
+  const [libelleUnite, setLibelleUnite] = useState(initial?.libelleUnite ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,6 +49,10 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
       setError("Choisissez une catégorie.");
       return;
     }
+    if (saisieALaPiece && (poidsUnitaireG.trim() === "" || libelleUnite.trim() === "")) {
+      setError("Renseignez le poids par unité et son libellé, ou décochez la saisie à la pièce.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -58,6 +65,8 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
         energie: toNullableNumber(energie),
         degreAlcool: isBoisson ? toNullableNumber(degreAlcool) : null,
         infoComplementaire: infoComplementaire.trim() === "" ? null : infoComplementaire,
+        poidsUnitaireG: saisieALaPiece ? toNullableNumber(poidsUnitaireG) : null,
+        libelleUnite: saisieALaPiece ? libelleUnite.trim() : null,
       });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erreur lors de l'enregistrement.");
@@ -152,6 +161,37 @@ export function AlimentForm({ initial, onSubmit, onCancel }: AlimentFormProps) {
           placeholder="Allergènes, conseil de conservation, etc."
         />
       </label>
+
+      <label className="aliment-form-checkbox">
+        <input
+          type="checkbox"
+          checked={saisieALaPiece}
+          onChange={(e) => setSaisieALaPiece(e.target.checked)}
+        />
+        Saisir cet aliment à la pièce dans les recettes (ex : 2 œufs) plutôt qu'en grammes
+      </label>
+      {saisieALaPiece && (
+        <div className="aliment-form-grid">
+          <label>
+            Poids d'une unité (g)
+            <input
+              type="number"
+              step="any"
+              min={0}
+              value={poidsUnitaireG}
+              onChange={(e) => setPoidsUnitaireG(e.target.value)}
+            />
+          </label>
+          <label>
+            Libellé de l'unité
+            <input
+              value={libelleUnite}
+              onChange={(e) => setLibelleUnite(e.target.value)}
+              placeholder="ex : œuf(s), jaune(s) d'œuf, tranche(s)"
+            />
+          </label>
+        </div>
+      )}
 
       {error && <p className="error">{error}</p>}
 

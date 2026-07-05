@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { Recipe, RecipeCategory, RecipeIngredientUnit, RecipeInput } from "../api/recipes";
+import type { Recipe, RecipeIngredient, RecipeCategory, RecipeIngredientUnit, RecipeInput } from "../api/recipes";
 import { getRecipePhotoUrl } from "../api/recipes";
 import { ApiError } from "../api/client";
 import { IngredientPicker } from "./IngredientPicker";
@@ -19,6 +19,29 @@ function defaultServings(category: RecipeCategory) {
   return category === "cocktail" ? 1 : 4;
 }
 
+// Convertit un ingrédient enregistré en grammes avant l'ajout de la saisie "à
+// la pièce" (ex: 36 g de jaune d'œuf) en quantité par pièce (2), si l'aliment
+// est depuis configuré pour ça — pour ne pas laisser l'utilisateur recalculer
+// à la main dans le formulaire de modification.
+function withCurrentUnit(ingredient: RecipeIngredient) {
+  if (ingredient.unit === "g" && ingredient.poidsUnitaireG) {
+    return {
+      alimentCode: ingredient.alimentCode,
+      nom: ingredient.nom,
+      quantity: Math.round((ingredient.quantity / ingredient.poidsUnitaireG) * 100) / 100,
+      unit: "unite" as RecipeIngredientUnit,
+      libelleUnite: ingredient.libelleUnite,
+    };
+  }
+  return {
+    alimentCode: ingredient.alimentCode,
+    nom: ingredient.nom,
+    quantity: ingredient.quantity,
+    unit: ingredient.unit,
+    libelleUnite: ingredient.libelleUnite,
+  };
+}
+
 function toForm(initial: Recipe | undefined, initialCategory: RecipeCategory) {
   const category = (initial?.category ?? initialCategory) as RecipeCategory;
   return {
@@ -28,8 +51,14 @@ function toForm(initial: Recipe | undefined, initialCategory: RecipeCategory) {
     servings: initial?.servings ?? defaultServings(category),
     category,
     ingredients:
-      initial?.ingredients ??
-      ([] as { alimentCode: number; quantity: number; unit: RecipeIngredientUnit; nom: string }[]),
+      initial?.ingredients.map(withCurrentUnit) ??
+      ([] as {
+        alimentCode: number;
+        quantity: number;
+        unit: RecipeIngredientUnit;
+        nom: string;
+        libelleUnite: string | null;
+      }[]),
   };
 }
 
@@ -40,7 +69,7 @@ export function RecipeForm({ initial, initialCategory = "plat", submitLabel, onS
   // cocktail, 4 sinon). Une recette existante est considérée comme déjà figée.
   const [servingsTouched, setServingsTouched] = useState(!!initial);
   const [photoPreview, setPhotoPreview] = useState<string | null>(
-    initial?.hasPhoto ? getRecipePhotoUrl(initial.id) : null
+    initial?.hasPhoto ? getRecipePhotoUrl(initial.id, initial.photoVersion) : null
   );
   // undefined = ne pas toucher la photo existante, null = la retirer, string = nouvelle photo.
   const [photoChange, setPhotoChange] = useState<string | null | undefined>(undefined);

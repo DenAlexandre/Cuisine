@@ -15,6 +15,24 @@ const BOISSONS_CATEGORIE_CODE = 8;
 // convertir les boissons en équivalent grammes lors du calcul nutritionnel, qui
 // repose sur des valeurs CIQUAL exprimées pour 100 g.
 const CL_TO_G = 10;
+const CL_TO_ML = 10;
+
+// Alcoolémie estimée (cocktails uniquement) via la formule de Widmark :
+// alcool pur (g) = volume (mL) x degré (% vol) x densité de l'éthanol / 100,
+// puis alcoolémie (g/L) = alcool pur (g) / (poids (kg) x facteur r).
+// Le poids utilisé est un poids de référence paramétrable par un admin (page
+// Options système), faute de connaître le poids réel de la personne qui
+// consultera la recette : c'est une estimation indicative, pas une mesure.
+const ETHANOL_DENSITY_G_PER_ML = 0.8;
+const WIDMARK_FACTOR = 0.7;
+const DEFAULT_REFERENCE_WEIGHT_KG = 70;
+
+async function fetchReferenceWeightKg(): Promise<number> {
+  const { rows } = await pool.query<{ reference_weight_kg: string }>(
+    "SELECT reference_weight_kg FROM system_settings WHERE id = 1"
+  );
+  return rows[0] ? Number(rows[0].reference_weight_kg) : DEFAULT_REFERENCE_WEIGHT_KG;
+}
 
 // Taille maximale acceptee pour la photo (deja recadree/compressee cote client) :
 // filet de securite au cas ou le controle cote client serait contourne.
@@ -41,7 +59,8 @@ const recipeSchema = z.object({
 const RECIPE_FIELDS = `
   r.id, r.title, r.description, r.steps, r.servings, r.category, r.status,
   r.created_at, r.reviewed_at, r.author_id, u.username AS author_username,
-  (r.photo IS NOT NULL) AS "hasPhoto"
+  (r.photo IS NOT NULL) AS "hasPhoto",
+  EXTRACT(EPOCH FROM r.photo_updated_at)::bigint AS "photoVersion"
 `;
 
 // Decode une data URL ("data:image/jpeg;base64,...") ou une chaine base64 nue.
@@ -54,12 +73,15 @@ interface IngredientRow {
   recipe_id: number;
   aliment_code: number;
   quantity: string;
-  unit: "g" | "cl";
+  unit: "g" | "cl" | "unite";
   nom: string;
   t_proteines: string | null;
   t_glucides: string | null;
   t_lipides: string | null;
   t_energie: string | null;
+  degre_alcool: string | null;
+  poids_unitaire_g: string | null;
+  libelle_unite: string | null;
 }
 
 function num(value: string | null): number {
@@ -68,22 +90,39 @@ function num(value: string | null): number {
 
 function quantityInGrams(row: IngredientRow): number {
   const quantity = num(row.quantity);
-  return row.unit === "cl" ? quantity * CL_TO_G : quantity;
+  if (row.unit === "cl") return quantity * CL_TO_G;
+  if (row.unit === "unite") return quantity * num(row.poids_unitaire_g);
+  return quantity;
+}
+
+function pureAlcoholGrams(row: IngredientRow): number {
+  if (row.unit !== "cl" || row.degre_alcool === null) return 0;
+  const volumeMl = num(row.quantity) * CL_TO_ML;
+  return volumeMl * (num(row.degre_alcool) / 100) * ETHANOL_DENSITY_G_PER_ML;
 }
 
 // Attache la liste des ingrédients et le total nutritionnel calculé à chaque recette.
-export async function attachIngredients<T extends { id: number }>(recipes: T[]) {
-  if (recipes.length === 0) return recipes as (T & { ingredients: unknown[]; nutrition: unknown })[];
+// Pour un cocktail, attache aussi une estimation indicative d'alcoolémie.
+export async function attachIngredients<
+  T extends { id: number; category?: string; servings?: number }
+>(recipes: T[]) {
+  if (recipes.length === 0) {
+    return recipes as (T & { ingredients: unknown[]; nutrition: unknown; alcohol: unknown })[];
+  }
 
-  const { rows } = await pool.query<IngredientRow>(
-    `SELECT ri.recipe_id, ri.aliment_code, ri.quantity, ri.unit,
-            a.t_aliment_nom AS nom, a.t_proteines, a.t_glucides, a.t_lipides, a.t_energie
-     FROM recipe_ingredients ri
-     JOIN aliments a ON a.t_aliment_code = ri.aliment_code
-     WHERE ri.recipe_id = ANY($1::int[])
-     ORDER BY ri.id ASC`,
-    [recipes.map((r) => r.id)]
-  );
+  const [{ rows }, referenceWeightKg] = await Promise.all([
+    pool.query<IngredientRow>(
+      `SELECT ri.recipe_id, ri.aliment_code, ri.quantity, ri.unit,
+              a.t_aliment_nom AS nom, a.t_proteines, a.t_glucides, a.t_lipides, a.t_energie,
+              a.degre_alcool, a.poids_unitaire_g, a.libelle_unite
+       FROM recipe_ingredients ri
+       JOIN aliments a ON a.t_aliment_code = ri.aliment_code
+       WHERE ri.recipe_id = ANY($1::int[])
+       ORDER BY ri.id ASC`,
+      [recipes.map((r) => r.id)]
+    ),
+    fetchReferenceWeightKg(),
+  ]);
 
   const byRecipe = new Map<number, IngredientRow[]>();
   for (const row of rows) {
@@ -103,9 +142,21 @@ export async function attachIngredients<T extends { id: number }>(recipes: T[]) 
       glucides: row.t_glucides === null ? null : num(row.t_glucides),
       lipides: row.t_lipides === null ? null : num(row.t_lipides),
       energie: row.t_energie === null ? null : num(row.t_energie),
+      // kcal réellement apportées par la quantité utilisée dans la recette
+      // (contrairement à "energie" ci-dessus, qui est la valeur CIQUAL pour 100 g).
+      kcal: row.t_energie === null ? null : (quantityInGrams(row) / 100) * num(row.t_energie),
+      degreAlcool: row.degre_alcool === null ? null : num(row.degre_alcool),
+      // Libellé ("œuf(s)"...) et poids par unité de l'aliment tel qu'il est
+      // configuré AUJOURD'HUI (indépendamment de l'unité réellement stockée sur
+      // cette ligne) : permet au formulaire d'édition de proposer de convertir
+      // un ingrédient enregistré en grammes avant l'ajout de cette fonctionnalité
+      // (ex: "36 g" de jaune d'œuf) vers une saisie "à la pièce" ("2").
+      libelleUnite: row.libelle_unite,
+      poidsUnitaireG: row.poids_unitaire_g === null ? null : num(row.poids_unitaire_g),
+      gramsEquivalent: row.unit === "unite" ? quantityInGrams(row) : null,
     }));
 
-    const nutrition = ingredientRows.reduce(
+    const totalNutrition = ingredientRows.reduce(
       (total, row) => {
         const factor = quantityInGrams(row) / 100;
         total.proteines += factor * num(row.t_proteines);
@@ -116,8 +167,34 @@ export async function attachIngredients<T extends { id: number }>(recipes: T[]) 
       },
       { proteines: 0, glucides: 0, lipides: 0, energie: 0 }
     );
+    // Valeurs par personne plutôt que pour la recette entière : c'est ce que la
+    // valeur nutritionnelle affichée doit représenter, comparable à un étiquetage
+    // nutritionnel individuel plutôt qu'au plat complet.
+    const servingsForNutrition = recipe.servings && recipe.servings > 0 ? recipe.servings : 1;
+    const nutrition = {
+      proteines: totalNutrition.proteines / servingsForNutrition,
+      glucides: totalNutrition.glucides / servingsForNutrition,
+      lipides: totalNutrition.lipides / servingsForNutrition,
+      energie: totalNutrition.energie / servingsForNutrition,
+    };
 
-    return { ...recipe, ingredients, nutrition };
+    let alcohol: {
+      gramsPerServing: number;
+      bloodAlcoholGL: number;
+      referenceWeightKg: number;
+    } | null = null;
+    if (recipe.category === "cocktail") {
+      const totalAlcoholG = ingredientRows.reduce((sum, row) => sum + pureAlcoholGrams(row), 0);
+      const servings = recipe.servings && recipe.servings > 0 ? recipe.servings : 1;
+      const gramsPerServing = totalAlcoholG / servings;
+      alcohol = {
+        gramsPerServing,
+        bloodAlcoholGL: gramsPerServing / (referenceWeightKg * WIDMARK_FACTOR),
+        referenceWeightKg,
+      };
+    }
+
+    return { ...recipe, ingredients, nutrition, alcohol };
   });
 }
 
@@ -148,16 +225,24 @@ async function writeIngredients(
     await client.query("DELETE FROM recipe_ingredients WHERE recipe_id = $1", [recipeId]);
 
     if (ingredients.length > 0) {
-      const { rows: categories } = await client.query<{
+      const { rows: aliments } = await client.query<{
         t_aliment_code: number;
         categorie_code: number;
-      }>("SELECT t_aliment_code, categorie_code FROM aliments WHERE t_aliment_code = ANY($1::int[])", [
-        ingredients.map((i) => i.alimentCode),
-      ]);
-      const categoryByCode = new Map(categories.map((c) => [c.t_aliment_code, c.categorie_code]));
+        poids_unitaire_g: string | null;
+      }>(
+        "SELECT t_aliment_code, categorie_code, poids_unitaire_g FROM aliments WHERE t_aliment_code = ANY($1::int[])",
+        [ingredients.map((i) => i.alimentCode)]
+      );
+      const alimentByCode = new Map(aliments.map((a) => [a.t_aliment_code, a]));
 
       for (const item of ingredients) {
-        const unit = categoryByCode.get(item.alimentCode) === BOISSONS_CATEGORIE_CODE ? "cl" : "g";
+        const aliment = alimentByCode.get(item.alimentCode);
+        const unit =
+          aliment?.categorie_code === BOISSONS_CATEGORIE_CODE
+            ? "cl"
+            : aliment?.poids_unitaire_g !== null && aliment?.poids_unitaire_g !== undefined
+              ? "unite"
+              : "g";
         await client.query(
           `INSERT INTO recipe_ingredients (recipe_id, aliment_code, quantity, unit) VALUES ($1, $2, $3, $4)`,
           [recipeId, item.alimentCode, item.quantity, unit]
@@ -230,7 +315,11 @@ router.get("/:id/photo", async (req, res) => {
     return res.status(404).json({ error: "Aucune photo pour cette recette." });
   }
   res.set("Content-Type", "image/jpeg");
-  res.set("Cache-Control", "private, max-age=3600");
+  // "no-cache" (pas "no-store") : le navigateur peut garder une copie mais doit
+  // la revalider avant de l'utiliser. Sans ça, l'URL etant toujours la même
+  // ("/recipes/:id/photo"), un "max-age" laissait le navigateur réafficher
+  // l'ancienne photo (avant recadrage) pendant une heure après une modification.
+  res.set("Cache-Control", "private, no-cache");
   res.send(photo);
 });
 
@@ -274,10 +363,11 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO recipes (title, description, steps, servings, category, photo, author_id, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+    `INSERT INTO recipes (title, description, steps, servings, category, photo, photo_updated_at, author_id, status)
+     VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $6::bytea IS NULL THEN NULL ELSE now() END, $7, 'pending')
      RETURNING id, title, description, steps, servings, category, status, created_at, author_id,
-               (photo IS NOT NULL) AS "hasPhoto"`,
+               (photo IS NOT NULL) AS "hasPhoto",
+               EXTRACT(EPOCH FROM photo_updated_at)::bigint AS "photoVersion"`,
     [title, description, steps, servings, category, photo, req.user!.id]
   );
   const recipe = result.rows[0];
@@ -327,16 +417,22 @@ router.put("/:id", requireAuth, async (req, res) => {
   );
 
   // photoBase64 absent du payload (undefined) => la photo existante n'est pas touchée.
+  // Horodater le changement (même en cas de suppression) : c'est ce qui permet
+  // au client de "casser" le cache navigateur en changeant l'URL de la photo.
   if (photoBase64 !== undefined) {
     const photo = photoBase64 === null ? null : decodePhotoBase64(photoBase64);
-    await pool.query("UPDATE recipes SET photo = $1 WHERE id = $2", [photo, req.params.id]);
+    await pool.query("UPDATE recipes SET photo = $1, photo_updated_at = now() WHERE id = $2", [
+      photo,
+      req.params.id,
+    ]);
   }
 
   await writeIngredients(Number(req.params.id), ingredients);
 
   const updated = await pool.query(
     `SELECT id, title, description, steps, servings, category, status, created_at, author_id,
-            (photo IS NOT NULL) AS "hasPhoto"
+            (photo IS NOT NULL) AS "hasPhoto",
+            EXTRACT(EPOCH FROM photo_updated_at)::bigint AS "photoVersion"
      FROM recipes WHERE id = $1`,
     [req.params.id]
   );

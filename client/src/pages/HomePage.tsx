@@ -107,7 +107,7 @@ export function HomePage() {
           <Link key={recipe.id} to={`/recettes/${recipe.id}`} className="recipe-card">
             {recipe.hasPhoto ? (
               <img
-                src={getRecipePhotoUrl(recipe.id)}
+                src={getRecipePhotoUrl(recipe.id, recipe.photoVersion)}
                 alt={recipe.title}
                 className="recipe-card-photo"
               />

@@ -3,8 +3,29 @@ import { createUser, deleteUser, fetchUsers, updateUser } from "../api/users";
 import type { AdminUser, AdminUserCreateInput } from "../api/users";
 import { UserForm } from "../components/UserForm";
 import { useAuth } from "../context/AuthContext";
+import { useSortableTable } from "../hooks/useSortableTable";
+import { SortableTh } from "../components/SortableTh";
 
 type FormState = { mode: "closed" } | { mode: "create" } | { mode: "edit"; user: AdminUser };
+
+type UserSortKey = "username" | "name" | "email" | "phone" | "role";
+
+function userSortValue(user: AdminUser, key: UserSortKey) {
+  switch (key) {
+    case "username":
+      return user.username;
+    case "name":
+      return `${user.firstName} ${user.lastName}`;
+    case "email":
+      return user.email;
+    case "phone":
+      return user.phone;
+    case "role":
+      return user.role;
+    default:
+      return null;
+  }
+}
 
 export function AdminUsersPage() {
   const { user: currentUser } = useAuth();
@@ -12,6 +33,10 @@ export function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>({ mode: "closed" });
   const [actionError, setActionError] = useState<string | null>(null);
+  const { sorted: sortedUsers, sortKey, direction, toggleSort } = useSortableTable<
+    AdminUser,
+    UserSortKey
+  >(users, userSortValue);
 
   function loadUsers() {
     return fetchUsers().then(({ users }) => setUsers(users));
@@ -72,16 +97,16 @@ export function AdminUsersPage() {
         <table className="nutrition-table">
           <thead>
             <tr>
-              <th>Pseudo</th>
-              <th>Nom</th>
-              <th>Email</th>
-              <th>Téléphone</th>
-              <th>Rôle</th>
+              <SortableTh label="Pseudo" sortKey="username" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Nom" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Email" sortKey="email" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Téléphone" sortKey="phone" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+              <SortableTh label="Rôle" sortKey="role" activeKey={sortKey} direction={direction} onSort={toggleSort} />
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {sortedUsers.map((u) => (
               <tr key={u.id}>
                 <td>{u.username}</td>
                 <td className="muted">

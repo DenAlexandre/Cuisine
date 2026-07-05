@@ -3,7 +3,7 @@ import { API_URL, apiFetch } from "./client";
 export type RecipeStatus = "pending" | "approved" | "rejected";
 export type RecipeCategory = "cocktail" | "entree" | "plat" | "dessert";
 
-export type RecipeIngredientUnit = "g" | "cl";
+export type RecipeIngredientUnit = "g" | "cl" | "unite";
 
 export interface RecipeIngredient {
   alimentCode: number;
@@ -14,6 +14,17 @@ export interface RecipeIngredient {
   glucides: number | null;
   lipides: number | null;
   energie: number | null;
+  // kcal réellement apportées par la quantité utilisée dans la recette.
+  kcal: number | null;
+  degreAlcool: number | null;
+  // Libellé affiché à la place de l'unité brute quand unit === "unite" (ex: "œuf(s)").
+  libelleUnite: string | null;
+  // Poids par unité tel que configuré aujourd'hui sur l'aliment (indépendant de
+  // l'unité réellement stockée sur cette ligne) : permet de convertir à l'édition
+  // un ingrédient enregistré en grammes avant l'ajout de cette fonctionnalité.
+  poidsUnitaireG: number | null;
+  // Équivalent en grammes, renseigné uniquement quand unit === "unite".
+  gramsEquivalent: number | null;
 }
 
 export interface RecipeNutrition {
@@ -21,6 +32,13 @@ export interface RecipeNutrition {
   glucides: number;
   lipides: number;
   energie: number;
+}
+
+// Estimation indicative (cocktails uniquement), voir attachIngredients côté serveur.
+export interface RecipeAlcohol {
+  gramsPerServing: number;
+  bloodAlcoholGL: number;
+  referenceWeightKg: number;
 }
 
 export interface Recipe {
@@ -37,8 +55,14 @@ export interface Recipe {
   author_username?: string;
   ingredients: RecipeIngredient[];
   nutrition: RecipeNutrition;
+  alcohol: RecipeAlcohol | null;
   isFavorite: boolean;
   hasPhoto: boolean;
+  // Horodatage (epoch) du dernier changement de photo, utilisé pour "casser" le
+  // cache navigateur (voir getRecipePhotoUrl) : sans ça, l'URL de la photo ne
+  // change jamais et le navigateur peut réafficher l'ancienne image après une
+  // modification, même avec un Cache-Control adapté.
+  photoVersion: number | null;
 }
 
 export interface RecipeIngredientInput {
@@ -57,8 +81,9 @@ export interface RecipeInput {
   ingredients: RecipeIngredientInput[];
 }
 
-export function getRecipePhotoUrl(id: number) {
-  return `${API_URL}/recipes/${id}/photo`;
+export function getRecipePhotoUrl(id: number, photoVersion?: number | null) {
+  const version = photoVersion != null ? `?v=${photoVersion}` : "";
+  return `${API_URL}/recipes/${id}/photo${version}`;
 }
 
 export function fetchApprovedRecipes(category?: RecipeCategory) {

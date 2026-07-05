@@ -1,5 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { z } from "zod";
 import { pool } from "../db/pool";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -9,9 +11,43 @@ const router = Router();
 
 router.use(requireAuth, requireRole("admin"));
 
+const execFileAsync = promisify(execFile);
+
+// Même conteneur que scripts/start-db.ps1 (par défaut "cuisine-db") : pg_dump
+// tourne à l'intérieur du conteneur pour ne pas dépendre d'un client
+// PostgreSQL installé sur la machine qui héberge le serveur Node.
+const DB_CONTAINER_NAME = process.env.DB_CONTAINER_NAME || "cuisine-db";
+
+function parseDatabaseUrl(databaseUrl: string) {
+  const url = new URL(databaseUrl);
+  return {
+    user: decodeURIComponent(url.username),
+    database: url.pathname.replace(/^\//, ""),
+  };
+}
+
+// Export complet de la base en .sql (schéma + données), via pg_dump.
+router.get("/export-sql", async (_req, res) => {
+  const { user, database } = parseDatabaseUrl(process.env.DATABASE_URL!);
+  try {
+    const { stdout } = await execFileAsync(
+      "docker",
+      ["exec", DB_CONTAINER_NAME, "pg_dump", "-U", user, database],
+      { maxBuffer: 200 * 1024 * 1024 }
+    );
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    res.setHeader("Content-Type", "application/sql; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="cuisine-export-${timestamp}.sql"`);
+    res.send(stdout);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erreur inconnue.";
+    res.status(500).json({ error: `Échec de l'export SQL : ${message}` });
+  }
+});
+
 router.get("/recipes/pending", async (_req, res) => {
   const result = await pool.query(
-    `SELECT r.id, r.title, r.description, r.steps, r.status,
+    `SELECT r.id, r.title, r.description, r.steps, r.status, r.servings, r.category,
             r.created_at, r.author_id, u.username AS author_username
      FROM recipes r
      JOIN users u ON u.id = r.author_id
@@ -133,6 +169,32 @@ router.put("/users/:id", async (req, res) => {
     return res.status(404).json({ error: "Utilisateur introuvable." });
   }
   res.json({ user: result.rows[0] });
+});
+
+const settingsSchema = z.object({
+  referenceWeightKg: z.number().positive().max(500),
+});
+
+// Poids de référence utilisé pour l'estimation d'alcoolémie des cocktails
+// (voir routes/recipes.ts) quand le poids réel de la personne est inconnu.
+router.get("/settings", async (_req, res) => {
+  const result = await pool.query(
+    `SELECT reference_weight_kg::float8 AS "referenceWeightKg" FROM system_settings WHERE id = 1`
+  );
+  res.json({ settings: result.rows[0] });
+});
+
+router.put("/settings", async (req, res) => {
+  const parsed = settingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+  const result = await pool.query(
+    `UPDATE system_settings SET reference_weight_kg = $1 WHERE id = 1
+     RETURNING reference_weight_kg::float8 AS "referenceWeightKg"`,
+    [parsed.data.referenceWeightKg]
+  );
+  res.json({ settings: result.rows[0] });
 });
 
 // Suppression d'un compte (admin uniquement). Un admin ne peut pas se supprimer

@@ -63,6 +63,13 @@ ALTER TABLE recipes ADD CONSTRAINT recipes_category_check
 -- Photo de la recette (deja recadree/compressee cote client avant envoi).
 ALTER TABLE recipes ADD COLUMN IF NOT EXISTS photo BYTEA;
 
+-- Horodatage du dernier changement de photo : utilise cote client comme
+-- parametre de cache-busting sur l'URL de la photo (voir routes/recipes.ts).
+-- Sans ca, l'URL restant identique apres une modification, le cache image du
+-- navigateur peut reafficher l'ancienne photo malgre un Cache-Control adapte.
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS photo_updated_at TIMESTAMPTZ;
+UPDATE recipes SET photo_updated_at = created_at WHERE photo_updated_at IS NULL AND photo IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_recipes_status ON recipes(status);
 CREATE INDEX IF NOT EXISTS idx_recipes_author ON recipes(author_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_category ON recipes(category);
@@ -126,6 +133,13 @@ ALTER TABLE aliments ADD COLUMN IF NOT EXISTS degre_alcool NUMERIC;
 -- Note libre optionnelle (allergenes, conseil de conservation, etc.).
 ALTER TABLE aliments ADD COLUMN IF NOT EXISTS info_complementaire TEXT;
 
+-- Permet de saisir un ingredient "par piece" (ex: 2 oeufs) plutot qu'en grammes :
+-- poids_unitaire_g convertit vers le grammage pour les calculs nutritionnels,
+-- libelle_unite est le texte affiche (ex: "oeuf(s)", "jaune(s) d'oeuf"), deja
+-- accorde par l'admin puisqu'il n'y a pas de pluralisation automatique.
+ALTER TABLE aliments ADD COLUMN IF NOT EXISTS poids_unitaire_g NUMERIC;
+ALTER TABLE aliments ADD COLUMN IF NOT EXISTS libelle_unite TEXT;
+
 -- Codes attribues aux aliments crees depuis l'interface admin (voir routes/aliments.ts),
 -- dans une plage qui ne recoupe jamais les codes CIQUAL importes (tous < 100000).
 CREATE SEQUENCE IF NOT EXISTS aliments_custom_code_seq START WITH 900000;
@@ -157,7 +171,7 @@ ALTER TABLE recipe_ingredients ALTER COLUMN unit SET DEFAULT 'g';
 UPDATE recipe_ingredients SET unit = 'g' WHERE unit IS NULL;
 ALTER TABLE recipe_ingredients ALTER COLUMN unit SET NOT NULL;
 ALTER TABLE recipe_ingredients DROP CONSTRAINT IF EXISTS recipe_ingredients_unit_check;
-ALTER TABLE recipe_ingredients ADD CONSTRAINT recipe_ingredients_unit_check CHECK (unit IN ('g', 'cl'));
+ALTER TABLE recipe_ingredients ADD CONSTRAINT recipe_ingredients_unit_check CHECK (unit IN ('g', 'cl', 'unite'));
 
 -- Filet de securite : la contrainte inline ci-dessus ne s'applique qu'a la creation
 -- initiale de la table. Si "aliments" a deja ete recreee via un DROP ... CASCADE
@@ -195,6 +209,17 @@ ALTER TABLE weight_entries ADD COLUMN IF NOT EXISTS height_cm NUMERIC;
 ALTER TABLE weight_entries ADD COLUMN IF NOT EXISTS bmi NUMERIC;
 
 CREATE INDEX IF NOT EXISTS idx_weight_entries_user ON weight_entries(user_id);
+
+-- Reglages globaux (ligne unique, id fige a 1). "reference_weight_kg" sert au
+-- calcul indicatif d'alcoolemie des cocktails (voir routes/recipes.ts) quand
+-- aucun poids personnel n'est disponible : ajustable par un admin (page
+-- Options systeme) plutot que fige dans le code.
+CREATE TABLE IF NOT EXISTS system_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  reference_weight_kg NUMERIC NOT NULL DEFAULT 70 CHECK (reference_weight_kg > 0),
+  CONSTRAINT system_settings_singleton CHECK (id = 1)
+);
+INSERT INTO system_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 `;
 
 async function migrate() {

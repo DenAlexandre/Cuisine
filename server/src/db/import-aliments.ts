@@ -6,6 +6,9 @@ import { pool } from "./pool";
 // Retient, pour un code donne, le nom le plus frequent parmi les aliments qui le
 // portent (les noms vides ou "-" sont ecartes en priorite : ce sont des artefacts
 // du dump source, pas des noms de groupe valides).
+// Les aliments crees depuis l'admin n'ont pas de classification CIQUAL
+// (t_groupe_code etc. restent NULL) : on les exclut de ces trois requetes,
+// sinon la premiere tente d'inserer une ligne "groupes" avec un code NULL.
 const GROUPES_SQL = `
 INSERT INTO groupes (code, nom)
 SELECT t_groupe_code, nom FROM (
@@ -15,6 +18,7 @@ SELECT t_groupe_code, nom FROM (
            ORDER BY (t_groupe_nom = '' OR t_groupe_nom = '-') ASC, COUNT(*) DESC
          ) AS rn
   FROM aliments
+  WHERE t_groupe_code IS NOT NULL
   GROUP BY t_groupe_code, t_groupe_nom
 ) ranked
 WHERE rn = 1
@@ -30,6 +34,7 @@ SELECT t_groupe_code, t_ss_groupe_code, nom FROM (
            ORDER BY (t_ss_groupe_nom = '' OR t_ss_groupe_nom = '-') ASC, COUNT(*) DESC
          ) AS rn
   FROM aliments
+  WHERE t_groupe_code IS NOT NULL AND t_ss_groupe_code IS NOT NULL
   GROUP BY t_groupe_code, t_ss_groupe_code, t_ss_groupe_nom
 ) ranked
 WHERE rn = 1
@@ -45,6 +50,7 @@ SELECT t_groupe_code, t_ss_groupe_code, t_ss_ss_groupe_code, nom FROM (
            ORDER BY (t_ss_ss_groupe_nom = '' OR t_ss_ss_groupe_nom = '-') ASC, COUNT(*) DESC
          ) AS rn
   FROM aliments
+  WHERE t_groupe_code IS NOT NULL AND t_ss_groupe_code IS NOT NULL AND t_ss_ss_groupe_code IS NOT NULL
   GROUP BY t_groupe_code, t_ss_groupe_code, t_ss_ss_groupe_code, t_ss_ss_groupe_nom
 ) ranked
 WHERE rn = 1
@@ -117,6 +123,48 @@ ALTER TABLE aliments
   ADD CONSTRAINT fk_aliments_categorie FOREIGN KEY (categorie_code) REFERENCES categories_simples(code);
 `;
 
+// Variantes crues de poulet (viande et abats) : jamais utilisées telles
+// quelles dans une recette, toujours cuites avant consommation. Retirées après
+// chaque import pour ne pas polluer la recherche d'ingrédients ; ciblées par
+// code précis (pas par motif texte) pour ne jamais toucher un aliment ajouté
+// depuis l'interface admin.
+const ALWAYS_COOKED_CHICKEN_CODES = [
+  40054, // Coeur, poulet, cru
+  40111, // Foie, poulet, cru
+  40700, // Gésier, poulet, cru
+  36007, // Poulet (var. blanc), viande et peau, cru
+  36008, // Poulet fermier, viande et peau, cru
+  36020, // Poulet éviscéré sans abats, cru
+  36023, // Poulet, aile, viande et peau, cru
+  36002, // Poulet, cuisse, viande et peau, cru
+  36037, // Poulet, cuisse, viande et peau, cru, bio
+  36038, // Poulet, cuisse, viande et peau, cru, label rouge
+  36024, // Poulet, cuisse, viande, cru
+  36017, // Poulet, filet, sans peau, cru
+  36039, // Poulet, filet, sans peau, cru, bio
+  36040, // Poulet, filet, sans peau, cru, label rouge
+  36019, // Poulet, haut de cuisse, viande, cru
+  36022, // Poulet, pilon, cru
+  36029, // Poulet, poitrine, viande et peau, cru
+  36016, // Poulet, viande et peau, cru
+  36003, // Poulet, viande, crue
+];
+
+// Poids moyen (g, partie comestible sans coquille) et libellé d'unité pour les
+// oeufs de poule les plus courants dans une recette : permet de saisir "2
+// oeufs" plutôt que de convertir soi-même en grammes. Autres oeufs (caille,
+// cane, dinde, oie) laissés en grammes, trop rarement comptés "à la pièce".
+const EGG_UNITS: { code: number; poidsUnitaireG: number; libelleUnite: string }[] = [
+  { code: 22000, poidsUnitaireG: 50, libelleUnite: "œuf(s)" }, // Oeuf, cru
+  { code: 22010, poidsUnitaireG: 50, libelleUnite: "œuf(s)" }, // Oeuf, dur
+  { code: 22011, poidsUnitaireG: 50, libelleUnite: "œuf(s)" }, // Oeuf, poché
+  { code: 22014, poidsUnitaireG: 50, libelleUnite: "œuf(s)" }, // Oeuf, à la coque
+  { code: 22002, poidsUnitaireG: 18, libelleUnite: "jaune(s) d'œuf" }, // jaune, cru
+  { code: 22009, poidsUnitaireG: 18, libelleUnite: "jaune(s) d'œuf" }, // jaune, cuit
+  { code: 22001, poidsUnitaireG: 33, libelleUnite: "blanc(s) d'œuf" }, // blanc, cru
+  { code: 22008, poidsUnitaireG: 33, libelleUnite: "blanc(s) d'œuf" }, // blanc, cuit
+];
+
 async function importAliments() {
   const sql = readFileSync(join(__dirname, "seed-data", "aliments.sql"), "utf-8");
   await pool.query(sql);
@@ -127,6 +175,16 @@ async function importAliments() {
   await pool.query(LINK_ALIMENTS_SQL);
   await pool.query(CATEGORIES_SQL);
   await pool.query(CATEGORIZE_ALIMENTS_SQL);
+  await pool.query("DELETE FROM aliments WHERE t_aliment_code = ANY($1::int[])", [
+    ALWAYS_COOKED_CHICKEN_CODES,
+  ]);
+
+  for (const egg of EGG_UNITS) {
+    await pool.query(
+      `UPDATE aliments SET poids_unitaire_g = $1, libelle_unite = $2 WHERE t_aliment_code = $3`,
+      [egg.poidsUnitaireG, egg.libelleUnite, egg.code]
+    );
+  }
 
   const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM aliments");
   const { rows: categoryRows } = await pool.query(

@@ -15,7 +15,7 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
 // L'authentification passe par un header Authorization (Bearer), pas un cookie :
 // pas besoin de "credentials: true" ni de cookie-parser.
-app.use(cors({ origin: CLIENT_ORIGIN }));
+app.use(cors({ origin: CLIENT_ORIGIN, exposedHeaders: ["Content-Disposition"] }));
 // Limite relevee pour accueillir la photo de recette (deja recadree/compressee
 // cote client, encodee en base64 dans le JSON).
 app.use(express.json({ limit: "5mb" }));

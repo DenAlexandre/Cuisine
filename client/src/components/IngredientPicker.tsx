@@ -7,6 +7,7 @@ import { CategoryFilter } from "./CategoryFilter";
 interface PickedIngredient extends RecipeIngredientInput {
   nom: string;
   unit: RecipeIngredientUnit;
+  libelleUnite: string | null;
 }
 
 interface IngredientPickerProps {
@@ -15,8 +16,10 @@ interface IngredientPickerProps {
   recipeCategory: RecipeCategory;
 }
 
-function unitFor(aliment: Aliment): RecipeIngredientUnit {
-  return aliment.categorie === "Boissons" ? "cl" : "g";
+function unitFor(aliment: Aliment): { unit: RecipeIngredientUnit; libelleUnite: string | null } {
+  if (aliment.categorie === "Boissons") return { unit: "cl", libelleUnite: null };
+  if (aliment.poidsUnitaireG != null) return { unit: "unite", libelleUnite: aliment.libelleUnite };
+  return { unit: "g", libelleUnite: null };
 }
 
 // Code de la catégorie simplifiée "Boissons" (voir import-aliments.ts) : un
@@ -62,9 +65,10 @@ export function IngredientPicker({ value, onChange, recipeCategory }: Ingredient
 
   function addIngredient(aliment: Aliment) {
     if (value.some((i) => i.alimentCode === aliment.code)) return;
+    const { unit, libelleUnite } = unitFor(aliment);
     onChange([
       ...value,
-      { alimentCode: aliment.code, nom: aliment.nom, quantity: 100, unit: unitFor(aliment) },
+      { alimentCode: aliment.code, nom: aliment.nom, quantity: unit === "unite" ? 1 : 100, unit, libelleUnite },
     ]);
     setQuery("");
     setSuggestions([]);
@@ -135,7 +139,7 @@ export function IngredientPicker({ value, onChange, recipeCategory }: Ingredient
                 value={item.quantity}
                 onChange={(e) => updateQuantity(item.alimentCode, Number(e.target.value))}
               />
-              <span className="muted">{item.unit}</span>
+              <span className="muted">{item.unit === "unite" ? item.libelleUnite : item.unit}</span>
               <button type="button" className="danger" onClick={() => removeIngredient(item.alimentCode)}>
                 Retirer
               </button>

@@ -52,7 +52,7 @@ npm run dev             # démarre sur http://localhost:5173
 
 ## Lancer en debug depuis VS Code
 
-Ouvrez le dossier `Cuisine` dans VS Code, puis dans l'onglet **Run and Debug** (Ctrl+Shift+D) :
+Ouvrez `Cuisine.code-workspace` (double-clic, ou `code Cuisine.code-workspace`), puis dans l'onglet **Run and Debug** (Ctrl+Shift+D) :
 
 - **Server: Debug (Express/TS)** : lance `npm run dev` dans un terminal avec breakpoints actifs sur le code TypeScript du serveur.
 - **Client: Debug (Chrome)** : démarre le serveur Vite puis ouvre Chrome avec les breakpoints actifs sur le code React (`client/src`).

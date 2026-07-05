@@ -12,7 +12,7 @@ export interface Recipe {
   created_at: string;
   reviewed_at: string | null;
   author_id: number;
-  author_email?: string;
+  author_username?: string;
 }
 
 export interface RecipeInput {

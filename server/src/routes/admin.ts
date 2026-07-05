@@ -9,7 +9,7 @@ router.use(requireAuth, requireRole("admin"));
 router.get("/recipes/pending", async (_req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.title, r.description, r.ingredients, r.steps, r.status,
-            r.created_at, r.author_id, u.email AS author_email
+            r.created_at, r.author_id, u.username AS author_username
      FROM recipes r
      JOIN users u ON u.id = r.author_id
      WHERE r.status = 'pending'

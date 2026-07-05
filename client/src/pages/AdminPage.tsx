@@ -36,7 +36,7 @@ export function AdminPage() {
           <li key={recipe.id}>
             <div>
               <Link to={`/recettes/${recipe.id}`}>{recipe.title}</Link>
-              <span className="muted"> — proposée par {recipe.author_email}</span>
+              <span className="muted"> — proposée par {recipe.author_username}</span>
             </div>
             <div className="admin-actions">
               <button onClick={() => handleApprove(recipe.id)}>Valider</button>

@@ -24,7 +24,7 @@ export function Layout() {
         <div className="auth-actions">
           {user ? (
             <>
-              <span>{user.email}</span>
+              <span>{user.username}</span>
               <button onClick={handleLogout}>Déconnexion</button>
             </>
           ) : (

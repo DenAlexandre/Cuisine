@@ -20,7 +20,7 @@ qui doivent être validées par un administrateur (`admin`) avant d'être visibl
 Le plus simple : lancer PostgreSQL via Docker avec le script fourni (idempotent, volume persistant) :
 
 ```powershell
-./start-db.ps1
+./scripts/start-db.ps1
 ```
 
 Sinon, créez manuellement une base PostgreSQL (ex: `cuisine`), puis dans `server/` :
@@ -28,26 +28,23 @@ Sinon, créez manuellement une base PostgreSQL (ex: `cuisine`), puis dans `serve
 ```bash
 cd server
 cp .env.example .env
-# éditez .env : DATABASE_URL, JWT_SECRET, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
+# éditez .env : DATABASE_URL, JWT_SECRET, SEED_ADMIN_*
 npm install
-npm run migrate   # crée les tables users / recipes
+npm run migrate   # crée/met à jour les tables users / recipes
 npm run seed      # crée le compte admin défini dans .env
 ```
 
-### 2. Serveur API
+### 2. Serveur + client
 
-```bash
-cd server
-npm run dev       # démarre sur http://localhost:4000
+```powershell
+./scripts/run-dev.ps1   # installe les dépendances si besoin et ouvre server (4000) + client (5173)
 ```
 
-### 3. Client
+Ou manuellement :
 
 ```bash
-cd client
-cp .env.example .env   # VITE_API_URL=http://localhost:4000/api
-npm install
-npm run dev             # démarre sur http://localhost:5173
+cd server && npm run dev       # http://localhost:4000
+cd client && cp .env.example .env && npm run dev   # http://localhost:5173
 ```
 
 ## Lancer en debug depuis VS Code
@@ -63,6 +60,8 @@ Les configurations sont dans `.vscode/launch.json` et `.vscode/tasks.json`.
 ## Fonctionnement
 
 - Un visiteur non connecté peut consulter les recettes **validées**.
+- L'inscription demande : pseudo, nom, prénom, email, téléphone et mot de passe. La **connexion se
+  fait avec le pseudo** (pas l'email).
 - Un utilisateur inscrit peut proposer une recette (statut `pending`), voir ses propres soumissions
   (tous statuts) et supprimer/modifier celles encore en attente.
 - Un administrateur (compte créé via `npm run seed`) accède à `/admin` pour valider ou rejeter les

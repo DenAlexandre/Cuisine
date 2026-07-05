@@ -4,21 +4,34 @@ export type Role = "admin" | "user";
 
 export interface User {
   id: number;
+  username: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  phone: string;
   role: Role;
 }
 
-export function register(email: string, password: string) {
+export interface RegisterInput {
+  username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
+export function register(input: RegisterInput) {
   return apiFetch<{ user: User }>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(input),
   });
 }
 
-export function login(email: string, password: string) {
+export function login(username: string, password: string) {
   return apiFetch<{ user: User }>("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, password }),
   });
 }
 

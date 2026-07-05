@@ -24,7 +24,7 @@ export function HomePage() {
           <Link key={recipe.id} to={`/recettes/${recipe.id}`} className="recipe-card">
             <h2>{recipe.title}</h2>
             <p>{recipe.description}</p>
-            <span className="muted">par {recipe.author_email}</span>
+            <span className="muted">par {recipe.author_username}</span>
           </Link>
         ))}
       </div>

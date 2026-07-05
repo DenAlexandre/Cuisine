@@ -14,7 +14,7 @@ const recipeSchema = z.object({
 
 const RECIPE_FIELDS = `
   r.id, r.title, r.description, r.ingredients, r.steps, r.status,
-  r.created_at, r.reviewed_at, r.author_id, u.email AS author_email
+  r.created_at, r.reviewed_at, r.author_id, u.username AS author_username
 `;
 
 // Liste publique des recettes approuvées
